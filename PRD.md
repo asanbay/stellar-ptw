@@ -1,140 +1,140 @@
 # Planning Guide
 
-A comprehensive task management and productivity application that helps users organize their work, track progress, and achieve their goals with an intuitive and beautiful interface.
+A comprehensive Permit-to-Work (PTW) personnel management system that enables organizations to manage work permits, track responsibilities, and maintain compliance with safety procedures based on the STE-PR-10-05-Rev2 protocol.
 
 **Experience Qualities**:
-1. **Efficient** - Every interaction should feel instantaneous and purposeful, removing friction from task management
-2. **Calm** - The interface should reduce stress rather than add to it, with generous spacing and soothing colors
-3. **Empowering** - Users should feel in control and accomplished, with clear visual feedback on their progress
+1. **Professional** - The interface must convey authority and trustworthiness, appropriate for industrial safety management
+2. **Clear** - Critical safety information must be immediately visible and unambiguous to prevent miscommunication
+3. **Accessible** - Multi-language support (Russian, Turkish, English) ensures all personnel can access vital information
 
-**Complexity Level**: Light Application (multiple features with basic state)
-  - Multiple interconnected features including task management, categories, filtering, and analytics with persistent state across sessions
+**Complexity Level**: Complex Application (advanced functionality with role-based access)
+  - Full authentication system with admin/viewer roles, persistent data management, multi-language support, and comprehensive safety procedure tracking
 
 ## Essential Features
 
-### Task Creation & Management
-- **Functionality**: Create, edit, complete, and delete tasks with title, description, priority, and due date
-- **Purpose**: Core functionality that allows users to capture and organize their work
-- **Trigger**: Click "Add Task" button or keyboard shortcut
-- **Progression**: Click button → Form appears → Enter details → Save → Task appears in list → Can edit/complete/delete
-- **Success criteria**: Tasks persist across sessions, can be modified, and maintain their state
+### Role-Based Authentication
+- **Functionality**: Admin login with GitHub authentication, public read-only access for non-admins
+- **Purpose**: Protect sensitive personnel data while allowing authorized viewing
+- **Trigger**: Page load checks authentication status
+- **Progression**: Load app → Check auth → Show admin controls if authorized → Otherwise show read-only view
+- **Success criteria**: Admins can edit data, others can only view; authentication persists across sessions
 
-### Category Organization
-- **Functionality**: Assign tasks to custom categories (Work, Personal, Health, Learning, etc.)
-- **Purpose**: Helps users segment different areas of life and focus on specific contexts
-- **Trigger**: Select category when creating/editing task, or filter by category
-- **Progression**: Create task → Select category → Task shows category badge → Filter by category → See filtered tasks
-- **Success criteria**: Categories are visually distinct, filterable, and maintain consistent coloring
+### Personnel Management
+- **Functionality**: Add, edit, delete personnel with roles (Issuer, Supervisor, Foreman, Worker)
+- **Purpose**: Maintain accurate records of who is authorized for what responsibilities
+- **Trigger**: Admin clicks "Add Personnel" or edits existing entry
+- **Progression**: Click add → Fill form → System auto-assigns duties based on role → Save → Updates list
+- **Success criteria**: Role-based duties and qualifications are automatically assigned; changes persist
 
-### Priority System
-- **Functionality**: Mark tasks as High, Medium, or Low priority with visual indicators
-- **Purpose**: Helps users identify what needs immediate attention versus what can wait
-- **Trigger**: Select priority level during task creation/editing
-- **Progression**: Set priority → Visual indicator appears → Sort by priority → High priority tasks stand out
-- **Success criteria**: Priority is immediately visible and affects task visual prominence
+### Multi-Language Support
+- **Functionality**: Switch between Russian, Turkish, and English with complete translation
+- **Purpose**: Ensure all personnel can read procedures in their preferred language
+- **Trigger**: Select language from dropdown
+- **Progression**: Change language → All UI and content translates → Preference saves
+- **Success criteria**: All text including duties, rules, and procedures translate completely
 
-### Progress Dashboard
-- **Functionality**: Visual analytics showing completion rate, category distribution, and productivity trends
-- **Purpose**: Motivates users by showing their accomplishments and patterns
-- **Trigger**: Click on "Dashboard" or "Analytics" tab
-- **Progression**: Navigate to dashboard → See charts → Understand productivity patterns → Feel motivated
-- **Success criteria**: Charts update in real-time, show meaningful insights, and are visually appealing
+### Procedure Documentation
+- **Functionality**: Display STE-PR-10-05-Rev2 procedure with roles, duties, and safety rules
+- **Purpose**: Provide authoritative reference for PTW procedures
+- **Trigger**: Navigate to Process, Rules, or Roles tabs
+- **Progression**: Click tab → View formatted procedures → Reference specific rules
+- **Success criteria**: Procedures are clearly formatted, searchable, and accessible
 
-### Smart Filtering & Search
-- **Functionality**: Filter tasks by status (all/active/completed), priority, category, and search by text
-- **Purpose**: Helps users focus on relevant tasks and quickly find what they need
-- **Trigger**: Use filter dropdown or search bar
-- **Progression**: Enter filter criteria → List updates instantly → See relevant tasks → Clear filters to reset
-- **Success criteria**: Filtering is instantaneous and can combine multiple criteria
+### Personnel Search & Filter
+- **Functionality**: Filter by role type, search by name/position
+- **Purpose**: Quickly locate specific personnel or view specific role groups
+- **Trigger**: Type in search box or click role filter
+- **Progression**: Enter criteria → List updates instantly → Select person → View details
+- **Success criteria**: Fast filtering with immediate results
 
 ## Edge Case Handling
-- **Empty States**: Show encouraging messages and helpful illustrations when no tasks exist, guiding users to create their first task
-- **Long Task Titles**: Truncate with ellipsis and show full text on hover to maintain layout integrity
-- **Past Due Dates**: Highlight overdue tasks with warning colors but keep them actionable
-- **Rapid Interactions**: Debounce search input and prevent duplicate submissions during task creation
-- **Data Migration**: Gracefully handle missing fields in older task entries with sensible defaults
+- **Unauthenticated Users**: Show full read-only interface; hide all edit/delete controls
+- **Missing Data**: Handle legacy entries gracefully with default values
+- **Language Switching Mid-Edit**: Preserve form data when language changes
+- **Concurrent Edits**: Use KV store for data consistency
+- **Network Issues**: Queue changes and retry on reconnection
 
 ## Design Direction
-The design should feel modern, professional, and calming - striking a balance between a serious productivity tool and an approachable daily companion with a minimal interface that lets content breathe and focuses attention on what matters most.
+The design should feel authoritative and industrial-professional, balancing the seriousness of safety management with modern usability—a clean, structured interface that prioritizes information clarity over decorative elements.
 
 ## Color Selection
-Triadic color scheme using blue (trust/productivity), warm orange (energy/action), and purple (creativity/completion) to create visual hierarchy and emotional resonance.
+Analogous color scheme using deep slate blues and teals to convey professionalism, trust, and industrial reliability.
 
-- **Primary Color**: Deep Blue (oklch(0.45 0.15 250)) - Communicates trust, stability, and professional productivity
-- **Secondary Colors**: Soft Purple (oklch(0.65 0.12 290)) for completed items and achievements; Warm Slate (oklch(0.55 0.02 260)) for secondary actions
-- **Accent Color**: Energetic Orange (oklch(0.68 0.18 45)) - Draws attention to CTAs, high-priority items, and important actions
+- **Primary Color**: Deep Slate (oklch(0.25 0.02 240)) - Communicates industrial professionalism and authority
+- **Secondary Colors**: Steel Blue (oklch(0.45 0.08 240)) for interactive elements; Cyan Accent (oklch(0.65 0.12 210)) for highlights
+- **Accent Color**: Safety Orange (oklch(0.70 0.15 45)) - Draws attention to warnings, high-priority items, and critical actions
 - **Foreground/Background Pairings**:
-  - Background (Soft Cream oklch(0.98 0.01 85)): Dark Blue text (oklch(0.25 0.08 250)) - Ratio 9.2:1 ✓
-  - Card (Pure White oklch(1 0 0)): Dark Blue text (oklch(0.25 0.08 250)) - Ratio 11.5:1 ✓
-  - Primary (Deep Blue oklch(0.45 0.15 250)): White text (oklch(1 0 0)) - Ratio 7.8:1 ✓
-  - Secondary (Soft Slate oklch(0.88 0.02 260)): Dark Blue text (oklch(0.25 0.08 250)) - Ratio 8.1:1 ✓
-  - Accent (Warm Orange oklch(0.68 0.18 45)): Dark Blue text (oklch(0.25 0.08 250)) - Ratio 4.9:1 ✓
-  - Muted (Light Gray oklch(0.94 0.01 260)): Medium Gray text (oklch(0.52 0.03 260)) - Ratio 5.2:1 ✓
+  - Background (Light Steel oklch(0.96 0.01 240)): Dark Slate text (oklch(0.25 0.02 240)) - Ratio 10.2:1 ✓
+  - Card (Pure White oklch(1 0 0)): Dark Slate text (oklch(0.25 0.02 240)) - Ratio 12.1:1 ✓
+  - Primary (Deep Slate oklch(0.25 0.02 240)): White text (oklch(1 0 0)) - Ratio 12.1:1 ✓
+  - Secondary (Steel Blue oklch(0.45 0.08 240)): White text (oklch(1 0 0)) - Ratio 6.8:1 ✓
+  - Accent (Safety Orange oklch(0.70 0.15 45)): Dark text (oklch(0.25 0.02 240)) - Ratio 5.2:1 ✓
+  - Muted (Light Gray oklch(0.94 0.01 240)): Medium Gray text (oklch(0.50 0.02 240)) - Ratio 5.5:1 ✓
 
 ## Font Selection
-Typography should convey clarity and modernity while maintaining excellent readability for extended use; Inter for its exceptional screen optimization and geometric precision.
+Typography should prioritize legibility and professionalism, appropriate for technical documentation; Inter for its clarity and comprehensive character set supporting Cyrillic, Latin, and Turkish.
 
 - **Typographic Hierarchy**:
-  - H1 (Page Title): Inter Bold / 32px / tight tracking (-0.02em) / line-height 1.2
-  - H2 (Section Headers): Inter SemiBold / 24px / tight tracking (-0.01em) / line-height 1.3
-  - H3 (Card Titles): Inter Medium / 18px / normal tracking / line-height 1.4
-  - Body (Task Content): Inter Regular / 15px / normal tracking / line-height 1.6
-  - Small (Metadata): Inter Medium / 13px / slight tracking (0.01em) / line-height 1.5
+  - H1 (App Title): Inter Bold / 28px / tight tracking (-0.01em) / line-height 1.2
+  - H2 (Section Headers): Inter SemiBold / 22px / normal tracking / line-height 1.3
+  - H3 (Card Titles): Inter SemiBold / 16px / normal tracking / line-height 1.4
+  - Body (Content): Inter Regular / 14px / normal tracking / line-height 1.6
+  - Small (Metadata): Inter Medium / 12px / slight tracking (0.01em) / line-height 1.5
   - Button Text: Inter SemiBold / 14px / normal tracking / line-height 1.4
 
 ## Animations
-Animations should be purposeful and subtle - guiding the eye during state changes and providing satisfying feedback without calling attention to themselves, creating a sense of physical responsiveness.
+Animations should be minimal and functional, respecting the professional context while providing necessary feedback for user actions.
 
-- **Purposeful Meaning**: Smooth check animations when completing tasks communicate accomplishment; cards that gently lift on hover suggest interactivity
-- **Hierarchy of Movement**: 
-  - Primary: Task completion animations (check mark draw, fade out)
-  - Secondary: List reordering and filtering (smooth position transitions)
-  - Tertiary: Hover states and button feedback (subtle scale/shadow changes)
+- **Purposeful Meaning**: Subtle transitions when switching tabs or filtering convey responsiveness; modal appearances suggest layered importance
+- **Hierarchy of Movement**:
+  - Primary: Modal open/close for data entry
+  - Secondary: List filtering and person selection
+  - Tertiary: Hover states and button feedback
 
 ## Component Selection
-- **Components**: 
-  - Dialog for task creation/editing (full form with all fields)
-  - Card for individual tasks with hover states
-  - Tabs for switching between task list and analytics dashboard
-  - Select for category and priority dropdowns
-  - Input for search and text fields
-  - Checkbox for task completion with custom styling
-  - Badge for categories and priority indicators
-  - Progress bar for visual completion metrics
-  - Calendar for date picker (react-day-picker)
-  - Button with primary/secondary/ghost variants
-  
-- **Customizations**: 
-  - Custom task card with gradient borders for priority levels
-  - Animated checkbox with checkmark draw animation using framer-motion
-  - Category badges with custom color mapping
-  - Empty state illustrations using simple SVG compositions
-  
-- **States**: 
-  - Buttons: Default state with subtle shadow, hover with lift effect, active with pressed state, disabled with reduced opacity
-  - Inputs: Focused state with blue ring and slight scale, error state with red ring, success with green checkmark
-  - Cards: Default flat, hover elevated with shadow transition, selected with blue border
-  
-- **Icon Selection**: 
-  - Plus (Add task)
-  - CheckCircle (Complete task)
-  - Trash (Delete)
+- **Components**:
+  - Tabs for main navigation (Personnel, Process, Roles, Rules, Analytics, Documents)
+  - Card for personnel profiles and procedure sections
+  - Dialog for add/edit personnel forms
+  - Badge for role indicators and permit types
+  - Button with primary/secondary/destructive variants
+  - Input for text fields and search
+  - Select for role and language selection
+  - Scroll Area for long procedure lists
+  - Avatar for personnel identification
+  - Separator for section division
+
+- **Customizations**:
+  - Custom role badges with specific colors (Issuer: Purple, Supervisor: Pink, Foreman: Amber, Worker: Indigo)
+  - Personnel sidebar with search and filter
+  - Procedure sections with timeline layout
+  - Stats cards for analytics dashboard
+
+- **States**:
+  - Buttons: Admin-only buttons hidden for non-admins; hover states for interactive feedback
+  - Cards: Selected personnel highlighted; hover elevation for clickable cards
+  - Inputs: Admin-only with focus rings; disabled for non-admins
+
+- **Icon Selection**:
+  - UserPlus (Add personnel)
   - PencilSimple (Edit)
-  - FunnelSimple (Filter)
+  - Trash (Delete)
+  - Users (Personnel)
+  - FileText (Process/Documents)
+  - ShieldCheck (Safety/Rules)
   - ChartBar (Analytics)
-  - Tag (Categories)
-  - CalendarBlank (Due dates)
-  - Flag (Priority)
-  
-- **Spacing**: 
-  - Container padding: p-6 on mobile, p-8 on desktop
-  - Card gaps: gap-4 for task lists
+  - Globe (Language)
+  - LockKey (Admin indicator)
+
+- **Spacing**:
+  - Container padding: p-4 on mobile, p-6 on desktop
+  - Sidebar width: 280px on desktop, collapsible on mobile
+  - Card gaps: gap-4 for lists
   - Form fields: space-y-4
-  - Section margins: mb-6 between major sections
-  
-- **Mobile**: 
-  - Single column layout for task cards
-  - Bottom sheet for task creation on mobile (drawer component)
-  - Collapsible filters in mobile view
-  - Sticky header with key actions
-  - Touch-friendly 44px minimum tap targets
+
+- **Mobile**:
+  - Collapsible sidebar that overlays content
+  - Bottom sheet for personnel forms
+  - Stacked layout for stats grid
+  - Touch-friendly 44px tap targets
+  - Sticky header with key controls

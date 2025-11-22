@@ -1,0 +1,133 @@
+import { Card } from '@/components/ui/card'
+import type { Language } from '@/lib/ptw-types'
+import { PROCEDURE_DUTIES, HIGH_RISK_WORKS, PROCESS_FLOW, ROLE_LABELS } from '@/lib/ptw-constants'
+
+interface ProcessTabProps {
+  language: Language
+}
+
+export function ProcessTab({ language }: ProcessTabProps) {
+  const labels = {
+    ru: {
+      processTitle: 'Процесс оформления НД',
+      highRiskTitle: 'Опасные работы',
+      procedureTitle: 'Процедура STE-PR-10-05-Rev2',
+      issuerTitle: 'Обязанности выдающего НД',
+      supervisorTitle: 'Обязанности ответственного руководителя',
+      foremanTitle: 'Обязанности производителя работ',
+      workerTitle: 'Обязанности исполнителей работ',
+    },
+    tr: {
+      processTitle: 'İş İzni Düzenleme Süreci',
+      highRiskTitle: 'Tehlikeli İşler',
+      procedureTitle: 'STE-PR-10-05-Rev2 Prosedürü',
+      issuerTitle: 'İzni Verenin Yükümlülükleri',
+      supervisorTitle: 'Sorumlu Yöneticinin Yükümlülükleri',
+      foremanTitle: 'İşi Yapanın Yükümlülükleri',
+      workerTitle: 'İşçilerin Yükümlülükleri',
+    },
+    en: {
+      processTitle: 'PTW Issuance Process',
+      highRiskTitle: 'High-Risk Works',
+      procedureTitle: 'STE-PR-10-05-Rev2 Procedure',
+      issuerTitle: 'PTW Issuer Obligations',
+      supervisorTitle: 'Responsible Supervisor Obligations',
+      foremanTitle: 'Work Performer Obligations',
+      workerTitle: 'Team Members Obligations',
+    },
+  }
+
+  const l = labels[language]
+
+  return (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+          <span>📋</span>
+          {l.processTitle}
+        </h2>
+        <div className="space-y-3">
+          {PROCESS_FLOW.map((step, index) => (
+            <div key={index} className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-sm">
+                {index + 1}
+              </div>
+              <div className="pt-2">
+                <p className="font-semibold text-sm">{step[language]}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="font-semibold mb-4 flex items-center gap-2">
+          <span className="text-lg">⚠️</span>
+          {l.highRiskTitle}
+        </h3>
+        <div className="space-y-2">
+          {HIGH_RISK_WORKS[language].map((work, index) => (
+            <div key={index} className="py-2 border-b last:border-0 flex items-start gap-2 text-sm">
+              <span className="font-bold text-destructive">⚠️</span>
+              <span>{work}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h2 className="text-xl font-bold mb-6">{l.procedureTitle}</h2>
+
+        <div className="space-y-6">
+          <div className="p-4 bg-muted/50 rounded-lg border-l-4 border-l-[oklch(0.60_0.18_290)]">
+            <h4 className="font-bold mb-3 text-[oklch(0.60_0.18_290)]">{l.issuerTitle}</h4>
+            <div className="space-y-2">
+              {PROCEDURE_DUTIES.issuer[language].map((duty, index) => (
+                <div key={index} className="flex gap-2 text-sm">
+                  <span className="text-primary font-bold">•</span>
+                  <span className="leading-relaxed">{duty}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-muted/50 rounded-lg border-l-4 border-l-[oklch(0.65_0.22_340)]">
+            <h4 className="font-bold mb-3 text-[oklch(0.65_0.22_340)]">{l.supervisorTitle}</h4>
+            <div className="space-y-2">
+              {PROCEDURE_DUTIES.supervisor[language].map((duty, index) => (
+                <div key={index} className="flex gap-2 text-sm">
+                  <span className="text-primary font-bold">•</span>
+                  <span className="leading-relaxed">{duty}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-muted/50 rounded-lg border-l-4 border-l-[oklch(0.70_0.18_60)]">
+            <h4 className="font-bold mb-3 text-[oklch(0.70_0.18_60)]">{l.foremanTitle}</h4>
+            <div className="space-y-2">
+              {PROCEDURE_DUTIES.foreman[language].map((duty, index) => (
+                <div key={index} className="flex gap-2 text-sm">
+                  <span className="text-primary font-bold">•</span>
+                  <span className="leading-relaxed">{duty}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-muted/50 rounded-lg border-l-4 border-l-[oklch(0.60_0.20_270)]">
+            <h4 className="font-bold mb-3 text-[oklch(0.60_0.20_270)]">{l.workerTitle}</h4>
+            <div className="space-y-2">
+              {PROCEDURE_DUTIES.worker[language].map((duty, index) => (
+                <div key={index} className="flex gap-2 text-sm">
+                  <span className="text-primary font-bold">•</span>
+                  <span className="leading-relaxed">{duty}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  )
+}

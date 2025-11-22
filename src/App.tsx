@@ -1,201 +1,243 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Plus, ChartBar, ListChecks } from '@phosphor-icons/react'
-import { AnimatePresence } from 'framer-motion'
+import { UserPlus, Download, Globe, LockKey } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { TaskCard } from '@/components/TaskCard'
-import { TaskDialog } from '@/components/TaskDialog'
-import { Dashboard } from '@/components/Dashboard'
-import { EmptyState } from '@/components/EmptyState'
-import { FilterBar } from '@/components/FilterBar'
-import type { Task, FilterStatus, Priority, Category } from '@/lib/types'
-import { calculateStats } from '@/lib/task-utils'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { PersonnelSidebar } from '@/components/PersonnelSidebar'
+import { PersonProfile } from '@/components/PersonProfile'
+import { PersonDialog } from '@/components/PersonDialog'
+import { ProcessTab } from '@/components/ProcessTab'
+import { RolesTab } from '@/components/RolesTab'
+import { RulesTab } from '@/components/RulesTab'
+import { AnalyticsTab } from '@/components/AnalyticsTab'
+import { DocumentsTab } from '@/components/DocumentsTab'
+import type { Person, Language } from '@/lib/ptw-types'
+import { useLanguage } from '@/hooks/use-language'
+import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
+
+const INITIAL_PERSONS: Person[] = [
+  {
+    id: '1',
+    name: 'Файзалиева Людмила',
+    position: 'Директор по ОТ и ПБ',
+    role: 'issuer',
+    email: 'l.fayzalieva@stellar.com',
+    phone: '+79991234567',
+  },
+  {
+    id: '2',
+    name: 'Мустафа Кючюкйылмаз',
+    position: 'Операционный директор',
+    role: 'supervisor',
+    email: 'm.kucukyilmaz@stellar.com',
+    phone: '+905551234567',
+  },
+  {
+    id: '3',
+    name: 'Петров Иван',
+    position: 'Мастер-производитель',
+    role: 'foreman',
+    email: 'i.petrov@stellar.com',
+    phone: '+79991234568',
+  },
+  {
+    id: '4',
+    name: 'Сидоров Сергей',
+    position: 'Рабочий-монтажник',
+    role: 'worker',
+    email: 's.sidorov@stellar.com',
+    phone: '+79991234569',
+  },
+]
 
 function App() {
-  const [tasks, setTasks] = useKV<Task[]>('tasks', [])
+  const [persons, setPersons] = useKV<Person[]>('ptw-persons', INITIAL_PERSONS)
+  const { language, setLanguage } = useLanguage()
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | undefined>()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>('all')
-  const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all')
-  const [categoryFilter, setCategoryFilter] = useState<Category | 'all'>('all')
+  const [editingPerson, setEditingPerson] = useState<Person | undefined>()
+  const [isAdmin, setIsAdmin] = useState(false)
 
-  const allTasks = tasks || []
-
-  const filteredTasks = useMemo(() => {
-    let filtered = allTasks
-
-    if (statusFilter === 'active') {
-      filtered = filtered.filter(t => !t.completed)
-    } else if (statusFilter === 'completed') {
-      filtered = filtered.filter(t => t.completed)
-    }
-
-    if (priorityFilter !== 'all') {
-      filtered = filtered.filter(t => t.priority === priorityFilter)
-    }
-
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(t => t.category === categoryFilter)
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(t =>
-        t.title.toLowerCase().includes(query) ||
-        t.description?.toLowerCase().includes(query)
-      )
-    }
-
-    return filtered.sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1
+  useEffect(() => {
+    async function checkAdmin() {
+      try {
+        const user = await window.spark.user()
+        setIsAdmin(user?.isOwner || false)
+      } catch {
+        setIsAdmin(false)
       }
-      const priorityOrder = { high: 0, medium: 1, low: 2 }
-      return priorityOrder[a.priority] - priorityOrder[b.priority]
-    })
-  }, [allTasks, statusFilter, priorityFilter, categoryFilter, searchQuery])
-
-  const stats = useMemo(() => calculateStats(allTasks), [allTasks])
-
-  const handleCreateTask = (taskData: Partial<Task>) => {
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      title: taskData.title!,
-      description: taskData.description,
-      completed: false,
-      priority: taskData.priority || 'medium',
-      category: taskData.category || 'personal',
-      dueDate: taskData.dueDate,
-      createdAt: new Date().toISOString(),
     }
+    checkAdmin()
+  }, [])
 
-    setTasks((current) => [...(current || []), newTask])
-    toast.success('Task created successfully')
-  }
+  const allPersons = persons || INITIAL_PERSONS
+  const stats = useMemo(() => calculatePersonStats(allPersons), [allPersons])
+  const selectedPerson = allPersons.find((p) => p.id === selectedPersonId)
 
-  const handleUpdateTask = (taskData: Partial<Task>) => {
-    setTasks((current) =>
-      (current || []).map(t =>
-        t.id === taskData.id
-          ? { ...t, ...taskData }
-          : t
-      )
-    )
-    toast.success('Task updated successfully')
-    setEditingTask(undefined)
-  }
-
-  const handleToggleTask = (id: string) => {
-    setTasks((current) =>
-      (current || []).map(t =>
-        t.id === id
-          ? {
-              ...t,
-              completed: !t.completed,
-              completedAt: !t.completed ? new Date().toISOString() : undefined,
-            }
-          : t
-      )
-    )
-  }
-
-  const handleDeleteTask = (id: string) => {
-    setTasks((current) => (current || []).filter(t => t.id !== id))
-    toast.success('Task deleted')
-  }
-
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task)
+  const handleAddPerson = () => {
+    setEditingPerson(undefined)
     setDialogOpen(true)
   }
 
-  const handleOpenDialog = () => {
-    setEditingTask(undefined)
+  const handleEditPerson = (person: Person) => {
+    setEditingPerson(person)
     setDialogOpen(true)
   }
+
+  const handleSavePerson = (personData: Partial<Person>) => {
+    if (editingPerson) {
+      setPersons((current) => (current || []).map((p) => (p.id === editingPerson.id ? { ...p, ...personData } : p)))
+      toast.success(language === 'ru' ? '✅ Обновлено' : language === 'tr' ? '✅ Güncellendi' : '✅ Updated')
+    } else {
+      const newPerson: Person = {
+        id: crypto.randomUUID(),
+        name: personData.name!,
+        position: personData.position!,
+        role: personData.role!,
+        email: personData.email,
+        phone: personData.phone,
+      }
+      setPersons((current) => [...(current || []), newPerson])
+      toast.success(language === 'ru' ? '✅ Добавлено' : language === 'tr' ? '✅ Eklendi' : '✅ Added')
+    }
+  }
+
+  const handleDeletePerson = (id: string) => {
+    const confirmMsg = language === 'ru' ? 'Вы уверены?' : language === 'tr' ? 'Emin misiniz?' : 'Are you sure?'
+    if (confirm(confirmMsg)) {
+      setPersons((current) => (current || []).filter((p) => p.id !== id))
+      setSelectedPersonId(null)
+      toast.success(language === 'ru' ? '✅ Удалено' : language === 'tr' ? '✅ Silindi' : '✅ Deleted')
+    }
+  }
+
+  const handleExport = () => {
+    exportToCSV(allPersons, language)
+    toast.success(language === 'ru' ? '✅ Экспортировано' : language === 'tr' ? '✅ Dışa Aktarıldı' : '✅ Exported')
+  }
+
+  const labels = {
+    ru: { appTitle: 'Stellar PTW', tabs: { personnel: 'Профиль', process: 'Процесс', roles: 'Роли', rules: 'Правила', analytics: 'Аналитика', docs: 'Документы' }, emptyTitle: 'Выберите сотрудника', emptyDesc: 'Нажмите на сотрудника слева для просмотра деталей' },
+    tr: { appTitle: 'Stellar PTW', tabs: { personnel: 'Profil', process: 'Süreç', roles: 'Roller', rules: 'Kurallar', analytics: 'Analiz', docs: 'Belgeler' }, emptyTitle: 'Çalışan Seçin', emptyDesc: 'Detayları görmek için soldaki bir çalışana tıklayın' },
+    en: { appTitle: 'Stellar PTW', tabs: { personnel: 'Profile', process: 'Process', roles: 'Roles', rules: 'Rules', analytics: 'Analytics', docs: 'Documents' }, emptyTitle: 'Select Personnel', emptyDesc: 'Click on a person in the sidebar to view details' },
+  }
+
+  const l = labels[language]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Toaster position="top-center" />
-      
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <header className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight mb-1">TaskFlow</h1>
-              <p className="text-muted-foreground">Organize your work, achieve your goals</p>
-            </div>
-            <Button onClick={handleOpenDialog} size="lg" className="font-semibold">
-              <Plus className="mr-2 h-5 w-5" weight="bold" />
-              New Task
-            </Button>
-          </div>
-        </header>
 
-        <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4" />
-              Tasks
-            </TabsTrigger>
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <ChartBar className="h-4 w-4" />
-              Dashboard
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="tasks" className="space-y-6">
-            <FilterBar
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              statusFilter={statusFilter}
-              onStatusChange={setStatusFilter}
-              priorityFilter={priorityFilter}
-              onPriorityChange={setPriorityFilter}
-              categoryFilter={categoryFilter}
-              onCategoryChange={setCategoryFilter}
-            />
-
-            {filteredTasks.length === 0 && allTasks.length === 0 ? (
-              <EmptyState onCreateTask={handleOpenDialog} />
-            ) : filteredTasks.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-muted-foreground text-lg">
-                  No tasks match your filters
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <AnimatePresence mode="popLayout">
-                  {filteredTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onToggle={handleToggleTask}
-                      onEdit={handleEditTask}
-                      onDelete={handleDeleteTask}
-                    />
-                  ))}
-                </AnimatePresence>
-              </div>
+      <header className="bg-gradient-to-r from-primary via-[oklch(0.28_0.03_240)] to-primary text-primary-foreground p-4 shadow-lg border-b">
+        <div className="max-w-[1800px] mx-auto flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">⭐</span>
+            <h1 className="text-xl font-bold">{l.appTitle}</h1>
+            {isAdmin && (
+              <span className="ml-2 px-2 py-0.5 bg-accent text-accent-foreground rounded text-xs font-semibold flex items-center gap-1">
+                <LockKey className="h-3 w-3" />
+                Admin
+              </span>
             )}
-          </TabsContent>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={language} onValueChange={(val) => setLanguage(val as Language)}>
+              <SelectTrigger className="w-[140px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
+                <Globe className="h-4 w-4 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ru">🇷🇺 Русский</SelectItem>
+                <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
+                <SelectItem value="en">🇬🇧 English</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="secondary" size="sm" onClick={handleExport} className="font-semibold">
+              <Download className="h-4 w-4 mr-1" />
+              {language === 'ru' ? 'Экспорт' : language === 'tr' ? 'Dışa Aktar' : 'Export'}
+            </Button>
+            {isAdmin && (
+              <Button size="sm" onClick={handleAddPerson} className="font-semibold bg-accent text-accent-foreground hover:bg-accent/90">
+                <UserPlus className="h-4 w-4 mr-1" />
+                {language === 'ru' ? 'Добавить' : language === 'tr' ? 'Ekle' : 'Add'}
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
 
-          <TabsContent value="dashboard">
-            <Dashboard stats={stats} />
-          </TabsContent>
-        </Tabs>
+      <div className="flex-1 flex overflow-hidden max-w-[1800px] mx-auto w-full">
+        <aside className="w-80 flex-shrink-0 hidden md:flex">
+          <PersonnelSidebar persons={allPersons} selectedId={selectedPersonId} onSelectPerson={setSelectedPersonId} language={language} />
+        </aside>
+
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <Tabs defaultValue="personnel" className="flex flex-col h-full">
+            <div className="bg-card border-b shadow-sm overflow-x-auto">
+              <TabsList className="inline-flex w-full justify-start h-auto p-0 bg-transparent">
+                <TabsTrigger value="personnel" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  👤 {l.tabs.personnel}
+                </TabsTrigger>
+                <TabsTrigger value="process" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  📋 {l.tabs.process}
+                </TabsTrigger>
+                <TabsTrigger value="roles" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  🎭 {l.tabs.roles}
+                </TabsTrigger>
+                <TabsTrigger value="rules" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  📏 {l.tabs.rules}
+                </TabsTrigger>
+                <TabsTrigger value="analytics" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  📊 {l.tabs.analytics}
+                </TabsTrigger>
+                <TabsTrigger value="docs" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  📄 {l.tabs.docs}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <TabsContent value="personnel" className="mt-0">
+                {selectedPerson ? (
+                  <PersonProfile person={selectedPerson} language={language} isAdmin={isAdmin} onEdit={handleEditPerson} onDelete={handleDeletePerson} />
+                ) : (
+                  <div className="flex items-center justify-center h-[400px] text-center">
+                    <div>
+                      <div className="text-6xl mb-4">👋</div>
+                      <h3 className="text-xl font-bold mb-2">{l.emptyTitle}</h3>
+                      <p className="text-muted-foreground">{l.emptyDesc}</p>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="process" className="mt-0">
+                <ProcessTab language={language} />
+              </TabsContent>
+
+              <TabsContent value="roles" className="mt-0">
+                <RolesTab persons={allPersons} language={language} />
+              </TabsContent>
+
+              <TabsContent value="rules" className="mt-0">
+                <RulesTab language={language} />
+              </TabsContent>
+
+              <TabsContent value="analytics" className="mt-0">
+                <AnalyticsTab stats={stats} language={language} />
+              </TabsContent>
+
+              <TabsContent value="docs" className="mt-0">
+                <DocumentsTab language={language} />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </main>
       </div>
 
-      <TaskDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSave={editingTask ? handleUpdateTask : handleCreateTask}
-        task={editingTask}
-      />
+      {isAdmin && <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} />}
     </div>
   )
 }
