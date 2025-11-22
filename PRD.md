@@ -13,18 +13,25 @@ A comprehensive Permit-to-Work (PTW) personnel management system that enables or
 ## Essential Features
 
 ### Role-Based Authentication
-- **Functionality**: Admin login with GitHub authentication, public read-only access for non-admins
-- **Purpose**: Protect sensitive personnel data while allowing authorized viewing
-- **Trigger**: Page load checks authentication status
-- **Progression**: Load app → Check auth → Show admin controls if authorized → Otherwise show read-only view
-- **Success criteria**: Admins can edit data, others can only view; authentication persists across sessions
+- **Functionality**: Admin/User mode switching with password authentication (password: "123"), separate access levels
+- **Purpose**: Protect sensitive personnel data while allowing authorized viewing and editing
+- **Trigger**: User clicks "Admin" or "User" button in header
+- **Progression**: Click Admin → Enter password → Authenticate → Switch to admin mode with full editing → Click User to return to read-only
+- **Success criteria**: Admins can edit all data after entering password, users can only view; mode persists during session
+
+### Information Board
+- **Functionality**: Announcement board displayed on main screen where admins can post and edit notices, all users can view
+- **Purpose**: Share current information, updates, and announcements with all personnel
+- **Trigger**: Auto-displays on Personnel tab; admins can add/edit announcements
+- **Progression**: Admin mode → Click add announcement → Enter title and content → Save → Appears for all users
+- **Success criteria**: Announcements persist, display chronologically, admins can edit/delete, users see all posts
 
 ### Personnel Management
-- **Functionality**: Add, edit, delete personnel with roles (Issuer, Supervisor, Foreman, Worker)
+- **Functionality**: Add, edit, delete personnel with roles (Issuer, Supervisor, Foreman, Worker) - admin mode only
 - **Purpose**: Maintain accurate records of who is authorized for what responsibilities
 - **Trigger**: Admin clicks "Add Personnel" or edits existing entry
 - **Progression**: Click add → Fill form → System auto-assigns duties based on role → Save → Updates list
-- **Success criteria**: Role-based duties and qualifications are automatically assigned; changes persist
+- **Success criteria**: Role-based duties and qualifications are automatically assigned and not editable; changes persist; only available in admin mode
 
 ### Multi-Language Support
 - **Functionality**: Switch between Russian, Turkish, and English with complete translation
@@ -48,11 +55,13 @@ A comprehensive Permit-to-Work (PTW) personnel management system that enables or
 - **Success criteria**: Fast filtering with immediate results
 
 ## Edge Case Handling
-- **Unauthenticated Users**: Show full read-only interface; hide all edit/delete controls
+- **Unauthenticated Users**: Show full read-only interface in user mode; hide all edit/delete controls
+- **Wrong Password**: Show error message, prevent admin mode access
 - **Missing Data**: Handle legacy entries gracefully with default values
 - **Language Switching Mid-Edit**: Preserve form data when language changes
 - **Concurrent Edits**: Use KV store for data consistency
 - **Network Issues**: Queue changes and retry on reconnection
+- **Empty Announcements**: Show friendly empty state encouraging first post
 
 ## Design Direction
 The design should feel authoritative and industrial-professional, balancing the seriousness of safety management with modern usability—a clean, structured interface that prioritizes information clarity over decorative elements.
@@ -94,11 +103,12 @@ Animations should be minimal and functional, respecting the professional context
 ## Component Selection
 - **Components**:
   - Tabs for main navigation (Personnel, Process, Roles, Rules, Analytics, Documents)
-  - Card for personnel profiles and procedure sections
-  - Dialog for add/edit personnel forms
+  - Card for personnel profiles, procedure sections, and information board
+  - Dialog for add/edit personnel forms and admin login
   - Badge for role indicators and permit types
   - Button with primary/secondary/destructive variants
-  - Input for text fields and search
+  - Input for text fields, search, and password entry
+  - Textarea for announcement content
   - Select for role and language selection
   - Scroll Area for long procedure lists
   - Avatar for personnel identification
@@ -109,6 +119,8 @@ Animations should be minimal and functional, respecting the professional context
   - Personnel sidebar with search and filter
   - Procedure sections with timeline layout
   - Stats cards for analytics dashboard
+  - Information board with admin edit controls and chronological display
+  - Admin/User mode toggle buttons with password protection
 
 - **States**:
   - Buttons: Admin-only buttons hidden for non-admins; hover states for interactive feedback
@@ -119,12 +131,18 @@ Animations should be minimal and functional, respecting the professional context
   - UserPlus (Add personnel)
   - PencilSimple (Edit)
   - Trash (Delete)
-  - Users (Personnel)
+  - Users (User mode)
+  - User (Switch to user mode)
   - FileText (Process/Documents)
   - ShieldCheck (Safety/Rules)
   - ChartBar (Analytics)
   - Globe (Language)
-  - LockKey (Admin indicator)
+  - LockKey (Admin indicator/login)
+  - SignIn (Login action)
+  - SignOut (Logout)
+  - Plus (Add announcement)
+  - Check (Save)
+  - X (Cancel)
 
 - **Spacing**:
   - Container padding: p-4 on mobile, p-6 on desktop

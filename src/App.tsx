@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { UserPlus, Download, Globe, LockKey } from '@phosphor-icons/react'
+import { UserPlus, Download, Globe, LockKey, User, SignOut } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -13,6 +13,8 @@ import { RolesTab } from '@/components/RolesTab'
 import { RulesTab } from '@/components/RulesTab'
 import { AnalyticsTab } from '@/components/AnalyticsTab'
 import { DocumentsTab } from '@/components/DocumentsTab'
+import { InfoBoard } from '@/components/InfoBoard'
+import { LoginDialog } from '@/components/LoginDialog'
 import type { Person, Language } from '@/lib/ptw-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
@@ -59,6 +61,8 @@ function App() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | undefined>()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [userMode, setUserMode] = useState<'user' | 'admin'>('user')
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false)
 
   useEffect(() => {
     async function checkAdmin() {
@@ -71,6 +75,22 @@ function App() {
     }
     checkAdmin()
   }, [])
+
+  const handleSwitchToAdmin = () => {
+    setLoginDialogOpen(true)
+  }
+
+  const handleAdminLogin = () => {
+    setUserMode('admin')
+    toast.success(language === 'ru' ? '✅ Вы вошли как администратор' : language === 'tr' ? '✅ Yönetici olarak giriş yaptınız' : '✅ Logged in as administrator')
+  }
+
+  const handleSwitchToUser = () => {
+    setUserMode('user')
+    toast.success(language === 'ru' ? '👤 Режим пользователя' : language === 'tr' ? '👤 Kullanıcı modu' : '👤 User mode')
+  }
+
+  const isAdminMode = userMode === 'admin'
 
   const allPersons = persons || INITIAL_PERSONS
   const stats = useMemo(() => calculatePersonStats(allPersons), [allPersons])
@@ -119,9 +139,33 @@ function App() {
   }
 
   const labels = {
-    ru: { appTitle: 'Stellar PTW', tabs: { personnel: 'Профиль', process: 'Процесс', roles: 'Роли', rules: 'Правила', analytics: 'Аналитика', docs: 'Документы' }, emptyTitle: 'Выберите сотрудника', emptyDesc: 'Нажмите на сотрудника слева для просмотра деталей' },
-    tr: { appTitle: 'Stellar PTW', tabs: { personnel: 'Profil', process: 'Süreç', roles: 'Roller', rules: 'Kurallar', analytics: 'Analiz', docs: 'Belgeler' }, emptyTitle: 'Çalışan Seçin', emptyDesc: 'Detayları görmek için soldaki bir çalışana tıklayın' },
-    en: { appTitle: 'Stellar PTW', tabs: { personnel: 'Profile', process: 'Process', roles: 'Roles', rules: 'Rules', analytics: 'Analytics', docs: 'Documents' }, emptyTitle: 'Select Personnel', emptyDesc: 'Click on a person in the sidebar to view details' },
+    ru: { 
+      appTitle: 'Stellar PTW', 
+      tabs: { personnel: 'Профиль', process: 'Процесс', roles: 'Роли', rules: 'Правила', analytics: 'Аналитика', docs: 'Документы' }, 
+      emptyTitle: 'Выберите сотрудника', 
+      emptyDesc: 'Нажмите на сотрудника слева для просмотра деталей',
+      adminMode: 'Админ',
+      userMode: 'Пользователь',
+      logout: 'Выйти',
+    },
+    tr: { 
+      appTitle: 'Stellar PTW', 
+      tabs: { personnel: 'Profil', process: 'Süreç', roles: 'Roller', rules: 'Kurallar', analytics: 'Analiz', docs: 'Belgeler' }, 
+      emptyTitle: 'Çalışan Seçin', 
+      emptyDesc: 'Detayları görmek için soldaki bir çalışana tıklayın',
+      adminMode: 'Yönetici',
+      userMode: 'Kullanıcı',
+      logout: 'Çıkış',
+    },
+    en: { 
+      appTitle: 'Stellar PTW', 
+      tabs: { personnel: 'Profile', process: 'Process', roles: 'Roles', rules: 'Rules', analytics: 'Analytics', docs: 'Documents' }, 
+      emptyTitle: 'Select Personnel', 
+      emptyDesc: 'Click on a person in the sidebar to view details',
+      adminMode: 'Admin',
+      userMode: 'User',
+      logout: 'Logout',
+    },
   }
 
   const l = labels[language]
@@ -135,14 +179,35 @@ function App() {
           <div className="flex items-center gap-2">
             <span className="text-2xl">⭐</span>
             <h1 className="text-xl font-bold">{l.appTitle}</h1>
-            {isAdmin && (
+            {isAdmin && isAdminMode && (
               <span className="ml-2 px-2 py-0.5 bg-accent text-accent-foreground rounded text-xs font-semibold flex items-center gap-1">
                 <LockKey className="h-3 w-3" />
-                Admin
+                {l.adminMode}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
+            {isAdminMode ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSwitchToUser}
+                className="font-semibold"
+              >
+                <User className="h-4 w-4 mr-1" />
+                {l.userMode}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSwitchToAdmin}
+                className="font-semibold"
+              >
+                <LockKey className="h-4 w-4 mr-1" />
+                {l.adminMode}
+              </Button>
+            )}
             <Select value={language} onValueChange={(val) => setLanguage(val as Language)}>
               <SelectTrigger className="w-[140px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
                 <Globe className="h-4 w-4 mr-1" />
@@ -158,7 +223,7 @@ function App() {
               <Download className="h-4 w-4 mr-1" />
               {language === 'ru' ? 'Экспорт' : language === 'tr' ? 'Dışa Aktar' : 'Export'}
             </Button>
-            {isAdmin && (
+            {isAdminMode && (
               <Button size="sm" onClick={handleAddPerson} className="font-semibold bg-accent text-accent-foreground hover:bg-accent/90">
                 <UserPlus className="h-4 w-4 mr-1" />
                 {language === 'ru' ? 'Добавить' : language === 'tr' ? 'Ekle' : 'Add'}
@@ -200,17 +265,24 @@ function App() {
 
             <div className="flex-1 overflow-y-auto p-6">
               <TabsContent value="personnel" className="mt-0">
-                {selectedPerson ? (
-                  <PersonProfile person={selectedPerson} language={language} isAdmin={isAdmin} onEdit={handleEditPerson} onDelete={handleDeletePerson} />
-                ) : (
-                  <div className="flex items-center justify-center h-[400px] text-center">
-                    <div>
-                      <div className="text-6xl mb-4">👋</div>
-                      <h3 className="text-xl font-bold mb-2">{l.emptyTitle}</h3>
-                      <p className="text-muted-foreground">{l.emptyDesc}</p>
-                    </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                  <div className="lg:col-span-1">
+                    <InfoBoard language={language} isAdmin={isAdminMode} />
                   </div>
-                )}
+                  <div className="lg:col-span-2">
+                    {selectedPerson ? (
+                      <PersonProfile person={selectedPerson} language={language} isAdmin={isAdminMode} onEdit={handleEditPerson} onDelete={handleDeletePerson} />
+                    ) : (
+                      <div className="flex items-center justify-center h-full min-h-[300px] text-center">
+                        <div>
+                          <div className="text-6xl mb-4">👋</div>
+                          <h3 className="text-xl font-bold mb-2">{l.emptyTitle}</h3>
+                          <p className="text-muted-foreground">{l.emptyDesc}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="process" className="mt-0">
@@ -237,7 +309,8 @@ function App() {
         </main>
       </div>
 
-      {isAdmin && <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} />}
+      <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} onLogin={handleAdminLogin} language={language} />
+      {isAdminMode && <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} />}
     </div>
   )
 }
