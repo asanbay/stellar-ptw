@@ -118,93 +118,96 @@ export function InfoBoard({ language, isAdmin }: InfoBoardProps) {
   }
 
   return (
-    <Card className="border-accent/20 shadow-lg">
-      <CardHeader className="bg-gradient-to-r from-accent/10 to-accent/5 border-b border-accent/20">
+    <Card className="border-accent/30 shadow-lg bg-gradient-to-br from-accent/5 via-card to-card overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-accent/15 via-accent/10 to-accent/5 border-b border-accent/30 pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+            <span className="text-xl">📢</span>
             {l.title}
           </CardTitle>
           {isAdmin && !isEditing && (
-            <Button size="sm" onClick={handleAdd} className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <Plus className="h-4 w-4 mr-1" />
+            <Button size="sm" onClick={handleAdd} className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm h-8">
+              <Plus className="h-3.5 w-3.5 mr-1" />
               {l.add}
             </Button>
           )}
         </div>
       </CardHeader>
-      <CardContent className="p-4">
+      <CardContent className="p-3">
         {isEditing ? (
-          <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+          <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-accent/20">
             <Input
               id="announcement-title"
               placeholder={l.titlePlaceholder}
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
-              className="font-semibold"
+              className="font-semibold h-9"
             />
             <Textarea
               id="announcement-content"
               placeholder={l.contentPlaceholder}
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              rows={4}
-              className="resize-none"
+              rows={3}
+              className="resize-none text-sm"
             />
             <div className="flex gap-2 justify-end">
-              <Button size="sm" variant="outline" onClick={handleCancel}>
-                <X className="h-4 w-4 mr-1" />
+              <Button size="sm" variant="outline" onClick={handleCancel} className="h-8">
+                <X className="h-3.5 w-3.5 mr-1" />
                 {l.cancel}
               </Button>
-              <Button size="sm" onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <Check className="h-4 w-4 mr-1" />
+              <Button size="sm" onClick={handleSave} className="bg-accent text-accent-foreground hover:bg-accent/90 h-8">
+                <Check className="h-3.5 w-3.5 mr-1" />
                 {l.save}
               </Button>
             </div>
           </div>
         ) : allAnnouncements.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <div className="text-4xl mb-2">📋</div>
-            <p>{l.noAnnouncements}</p>
+          <div className="text-center py-6 text-muted-foreground">
+            <div className="text-3xl mb-1.5">📋</div>
+            <p className="text-sm">{l.noAnnouncements}</p>
           </div>
         ) : (
-          <div className="space-y-3 max-h-[300px] overflow-y-auto">
+          <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
             {allAnnouncements.map((announcement) => (
               <div
                 key={announcement.id}
-                className="p-3 bg-card border border-border rounded-lg hover:shadow-md transition-shadow"
+                className="p-2.5 bg-card border border-accent/20 rounded-lg hover:shadow-md hover:border-accent/40 transition-all duration-200 relative overflow-hidden group"
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-accent to-accent/40 opacity-60 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-start justify-between gap-2 pl-2">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-sm mb-1 text-foreground">
+                    <h4 className="font-semibold text-sm mb-0.5 text-foreground leading-tight">
                       {announcement.title}
                     </h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed line-clamp-2">
                       {announcement.content}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-2">
+                    <p className="text-[10px] text-muted-foreground/80 mt-1.5 flex items-center gap-1">
+                      <span>🕐</span>
                       {new Date(announcement.date).toLocaleDateString(
                         language === 'ru' ? 'ru-RU' : language === 'tr' ? 'tr-TR' : 'en-US',
-                        { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }
+                        { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
                       )}
                     </p>
                   </div>
                   {isAdmin && (
-                    <div className="flex gap-1 flex-shrink-0">
+                    <div className="flex gap-0.5 flex-shrink-0">
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => handleEdit(announcement)}
-                        className="h-7 w-7 p-0"
+                        className="h-6 w-6 p-0 hover:bg-accent/20"
                       >
-                        <PencilSimple className="h-3.5 w-3.5" />
+                        <PencilSimple className="h-3 w-3" />
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => handleDelete(announcement.id)}
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
-                        <Trash className="h-3.5 w-3.5" />
+                        <Trash className="h-3 w-3" />
                       </Button>
                     </div>
                   )}

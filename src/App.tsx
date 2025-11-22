@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { UserPlus, Download, Globe, LockKey, User, SignOut } from '@phosphor-icons/react'
+import { UserPlus, Download, Globe, LockKey, User, Palette } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -18,6 +18,7 @@ import { LoginDialog } from '@/components/LoginDialog'
 import type { Person, Language } from '@/lib/ptw-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
+import { THEMES } from '@/lib/themes'
 
 const INITIAL_PERSONS: Person[] = [
   {
@@ -63,6 +64,19 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [userMode, setUserMode] = useState<'user' | 'admin'>('user')
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
+  const [currentTheme, setCurrentTheme] = useKV<string>('ptw-theme', 'stellar')
+
+  useEffect(() => {
+    const themeKey = currentTheme || 'stellar'
+    const theme = THEMES[themeKey]
+    if (theme) {
+      const root = document.documentElement
+      Object.entries(theme.colors).forEach(([key, value]) => {
+        const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+        root.style.setProperty(`--${cssVar}`, value)
+      })
+    }
+  }, [currentTheme])
 
   useEffect(() => {
     async function checkAdmin() {
@@ -138,6 +152,16 @@ function App() {
     toast.success(language === 'ru' ? '✅ Экспортировано' : language === 'tr' ? '✅ Dışa Aktarıldı' : '✅ Exported')
   }
 
+  const handleUpdateDuties = (personId: string, duties: string[]) => {
+    setPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customDuties: duties } : p)))
+    toast.success(language === 'ru' ? '✅ Обязанности обновлены' : language === 'tr' ? '✅ Yükümlülükler güncellendi' : '✅ Duties updated')
+  }
+
+  const handleUpdateQualifications = (personId: string, qualifications: string[]) => {
+    setPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customQualifications: qualifications } : p)))
+    toast.success(language === 'ru' ? '✅ Квалификация обновлена' : language === 'tr' ? '✅ Nitelikler güncellendi' : '✅ Qualifications updated')
+  }
+
   const labels = {
     ru: { 
       appTitle: 'Stellar PTW', 
@@ -147,6 +171,7 @@ function App() {
       adminMode: 'Админ',
       userMode: 'Пользователь',
       logout: 'Выйти',
+      theme: 'Тема',
     },
     tr: { 
       appTitle: 'Stellar PTW', 
@@ -156,6 +181,7 @@ function App() {
       adminMode: 'Yönetici',
       userMode: 'Kullanıcı',
       logout: 'Çıkış',
+      theme: 'Tema',
     },
     en: { 
       appTitle: 'Stellar PTW', 
@@ -165,6 +191,7 @@ function App() {
       adminMode: 'Admin',
       userMode: 'User',
       logout: 'Logout',
+      theme: 'Theme',
     },
   }
 
@@ -177,7 +204,7 @@ function App() {
       <header className="bg-gradient-to-r from-primary via-[oklch(0.28_0.03_240)] to-primary text-primary-foreground p-4 shadow-lg border-b">
         <div className="max-w-[1800px] mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">⭐</span>
+            <span className="text-2xl">{THEMES[currentTheme || 'stellar']?.emoji || '⭐'}</span>
             <h1 className="text-xl font-bold">{l.appTitle}</h1>
             {isAdmin && isAdminMode && (
               <span className="ml-2 px-2 py-0.5 bg-accent text-accent-foreground rounded text-xs font-semibold flex items-center gap-1">
@@ -208,6 +235,19 @@ function App() {
                 {l.adminMode}
               </Button>
             )}
+            <Select value={currentTheme || 'stellar'} onValueChange={(val) => setCurrentTheme(val)}>
+              <SelectTrigger className="w-[160px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
+                <Palette className="h-4 w-4 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(THEMES).map(([key, theme]) => (
+                  <SelectItem key={key} value={key}>
+                    {theme.emoji} {theme.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={language} onValueChange={(val) => setLanguage(val as Language)}>
               <SelectTrigger className="w-[140px] bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground">
                 <Globe className="h-4 w-4 mr-1" />
@@ -265,13 +305,21 @@ function App() {
 
             <div className="flex-1 overflow-y-auto p-6">
               <TabsContent value="personnel" className="mt-0">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                  <div className="lg:col-span-1">
+                <div className="space-y-6">
+                  <div className="w-full">
                     <InfoBoard language={language} isAdmin={isAdminMode} />
                   </div>
-                  <div className="lg:col-span-2">
+                  <div>
                     {selectedPerson ? (
-                      <PersonProfile person={selectedPerson} language={language} isAdmin={isAdminMode} onEdit={handleEditPerson} onDelete={handleDeletePerson} />
+                      <PersonProfile 
+                        person={selectedPerson} 
+                        language={language} 
+                        isAdmin={isAdminMode} 
+                        onEdit={handleEditPerson} 
+                        onDelete={handleDeletePerson}
+                        onUpdateDuties={handleUpdateDuties}
+                        onUpdateQualifications={handleUpdateQualifications}
+                      />
                     ) : (
                       <div className="flex items-center justify-center h-full min-h-[300px] text-center">
                         <div>

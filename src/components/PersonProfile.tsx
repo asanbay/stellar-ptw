@@ -1,7 +1,9 @@
-import { PencilSimple, Trash, Envelope, Phone } from '@phosphor-icons/react'
+import { useState } from 'react'
+import { PencilSimple, Trash, Envelope, Phone, Check, X, Plus } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import type { Person, Language } from '@/lib/ptw-types'
 import { ROLE_COLORS, ROLE_LABELS, PROCEDURE_DUTIES, AUTO_QUALIFICATIONS, AUTO_ORDER_TYPES } from '@/lib/ptw-constants'
 import { getInitials } from '@/lib/ptw-utils'
@@ -12,12 +14,24 @@ interface PersonProfileProps {
   isAdmin: boolean
   onEdit: (person: Person) => void
   onDelete: (id: string) => void
+  onUpdateDuties?: (personId: string, duties: string[]) => void
+  onUpdateQualifications?: (personId: string, qualifications: string[]) => void
 }
 
-export function PersonProfile({ person, language, isAdmin, onEdit, onDelete }: PersonProfileProps) {
-  const duties = PROCEDURE_DUTIES[person.role][language]
-  const qualifications = AUTO_QUALIFICATIONS[person.role][language]
+export function PersonProfile({ person, language, isAdmin, onEdit, onDelete, onUpdateDuties, onUpdateQualifications }: PersonProfileProps) {
+  const defaultDuties = PROCEDURE_DUTIES[person.role][language]
+  const defaultQualifications = AUTO_QUALIFICATIONS[person.role][language]
   const orderTypes = AUTO_ORDER_TYPES[person.role]
+
+  const duties = person.customDuties || defaultDuties
+  const qualifications = person.customQualifications || defaultQualifications
+
+  const [editingDuties, setEditingDuties] = useState(false)
+  const [editingQualifications, setEditingQualifications] = useState(false)
+  const [tempDuties, setTempDuties] = useState<string[]>([])
+  const [tempQualifications, setTempQualifications] = useState<string[]>([])
+  const [newDuty, setNewDuty] = useState('')
+  const [newQualification, setNewQualification] = useState('')
 
   const labels = {
     ru: {
@@ -26,6 +40,12 @@ export function PersonProfile({ person, language, isAdmin, onEdit, onDelete }: P
       permitTypes: 'Типы нарядов',
       edit: 'Редактировать',
       delete: 'Удалить',
+      save: 'Сохранить',
+      cancel: 'Отмена',
+      add: 'Добавить',
+      addDuty: 'Добавить обязанность',
+      addQualification: 'Добавить квалификацию',
+      reset: 'Сбросить',
     },
     tr: {
       duties: 'Yükümlülükler',
@@ -33,6 +53,12 @@ export function PersonProfile({ person, language, isAdmin, onEdit, onDelete }: P
       permitTypes: 'İzin Türleri',
       edit: 'Düzenle',
       delete: 'Sil',
+      save: 'Kaydet',
+      cancel: 'İptal',
+      add: 'Ekle',
+      addDuty: 'Yükümlülük ekle',
+      addQualification: 'Nitelik ekle',
+      reset: 'Sıfırla',
     },
     en: {
       duties: 'Duties',
@@ -40,10 +66,90 @@ export function PersonProfile({ person, language, isAdmin, onEdit, onDelete }: P
       permitTypes: 'Permit Types',
       edit: 'Edit',
       delete: 'Delete',
+      save: 'Save',
+      cancel: 'Cancel',
+      add: 'Add',
+      addDuty: 'Add duty',
+      addQualification: 'Add qualification',
+      reset: 'Reset',
     },
   }
 
   const l = labels[language]
+
+  const handleEditDuties = () => {
+    setTempDuties([...duties])
+    setEditingDuties(true)
+  }
+
+  const handleSaveDuties = () => {
+    if (onUpdateDuties) {
+      onUpdateDuties(person.id, tempDuties)
+    }
+    setEditingDuties(false)
+    setNewDuty('')
+  }
+
+  const handleCancelDuties = () => {
+    setEditingDuties(false)
+    setTempDuties([])
+    setNewDuty('')
+  }
+
+  const handleAddDuty = () => {
+    if (newDuty.trim()) {
+      setTempDuties([...tempDuties, newDuty.trim()])
+      setNewDuty('')
+    }
+  }
+
+  const handleRemoveDuty = (index: number) => {
+    setTempDuties(tempDuties.filter((_, i) => i !== index))
+  }
+
+  const handleEditQualifications = () => {
+    setTempQualifications([...qualifications])
+    setEditingQualifications(true)
+  }
+
+  const handleSaveQualifications = () => {
+    if (onUpdateQualifications) {
+      onUpdateQualifications(person.id, tempQualifications)
+    }
+    setEditingQualifications(false)
+    setNewQualification('')
+  }
+
+  const handleCancelQualifications = () => {
+    setEditingQualifications(false)
+    setTempQualifications([])
+    setNewQualification('')
+  }
+
+  const handleAddQualification = () => {
+    if (newQualification.trim()) {
+      setTempQualifications([...tempQualifications, newQualification.trim()])
+      setNewQualification('')
+    }
+  }
+
+  const handleRemoveQualification = (index: number) => {
+    setTempQualifications(tempQualifications.filter((_, i) => i !== index))
+  }
+
+  const handleResetDuties = () => {
+    if (onUpdateDuties) {
+      onUpdateDuties(person.id, defaultDuties)
+    }
+    setEditingDuties(false)
+  }
+
+  const handleResetQualifications = () => {
+    if (onUpdateQualifications) {
+      onUpdateQualifications(person.id, defaultQualifications)
+    }
+    setEditingQualifications(false)
+  }
 
   return (
     <div className="space-y-6">
@@ -102,33 +208,149 @@ export function PersonProfile({ person, language, isAdmin, onEdit, onDelete }: P
       </Card>
 
       <Card className="p-6">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <span className="text-lg">📋</span>
-          {l.duties}
-        </h3>
-        <ul className="space-y-2">
-          {duties.map((duty, index) => (
-            <li key={index} className="flex gap-3 text-sm">
-              <span className="text-primary font-bold flex-shrink-0">✓</span>
-              <span className="leading-relaxed">{duty}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <span className="text-lg">📋</span>
+            {l.duties}
+          </h3>
+          {isAdmin && !editingDuties && (
+            <div className="flex gap-2">
+              {person.customDuties && (
+                <Button size="sm" variant="outline" onClick={handleResetDuties} className="h-8 text-xs">
+                  {l.reset}
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={handleEditDuties} className="h-8">
+                <PencilSimple className="h-3.5 w-3.5 mr-1" />
+                {l.edit}
+              </Button>
+            </div>
+          )}
+        </div>
+        {editingDuties ? (
+          <div className="space-y-3">
+            <ul className="space-y-2">
+              {tempDuties.map((duty, index) => (
+                <li key={index} className="flex gap-2 text-sm items-start bg-muted/50 p-2 rounded">
+                  <span className="text-primary font-bold flex-shrink-0 mt-0.5">✓</span>
+                  <span className="leading-relaxed flex-1">{duty}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleRemoveDuty(index)}
+                    className="h-6 w-6 p-0 text-destructive hover:text-destructive flex-shrink-0"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <Input
+                placeholder={l.addDuty}
+                value={newDuty}
+                onChange={(e) => setNewDuty(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddDuty()}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleAddDuty} disabled={!newDuty.trim()}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex gap-2 justify-end pt-2 border-t">
+              <Button size="sm" variant="outline" onClick={handleCancelDuties}>
+                <X className="h-3.5 w-3.5 mr-1" />
+                {l.cancel}
+              </Button>
+              <Button size="sm" onClick={handleSaveDuties} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Check className="h-3.5 w-3.5 mr-1" />
+                {l.save}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {duties.map((duty, index) => (
+              <li key={index} className="flex gap-3 text-sm">
+                <span className="text-primary font-bold flex-shrink-0">✓</span>
+                <span className="leading-relaxed">{duty}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card className="p-6">
-        <h3 className="font-semibold mb-4 flex items-center gap-2">
-          <span className="text-lg">🎓</span>
-          {l.qualifications}
-        </h3>
-        <ul className="space-y-2">
-          {qualifications.map((qual, index) => (
-            <li key={index} className="flex gap-3 text-sm">
-              <span className="text-primary font-bold flex-shrink-0">✓</span>
-              <span className="leading-relaxed">{qual}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <span className="text-lg">🎓</span>
+            {l.qualifications}
+          </h3>
+          {isAdmin && !editingQualifications && (
+            <div className="flex gap-2">
+              {person.customQualifications && (
+                <Button size="sm" variant="outline" onClick={handleResetQualifications} className="h-8 text-xs">
+                  {l.reset}
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={handleEditQualifications} className="h-8">
+                <PencilSimple className="h-3.5 w-3.5 mr-1" />
+                {l.edit}
+              </Button>
+            </div>
+          )}
+        </div>
+        {editingQualifications ? (
+          <div className="space-y-3">
+            <ul className="space-y-2">
+              {tempQualifications.map((qual, index) => (
+                <li key={index} className="flex gap-2 text-sm items-start bg-muted/50 p-2 rounded">
+                  <span className="text-primary font-bold flex-shrink-0 mt-0.5">✓</span>
+                  <span className="leading-relaxed flex-1">{qual}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleRemoveQualification(index)}
+                    className="h-6 w-6 p-0 text-destructive hover:text-destructive flex-shrink-0"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <Input
+                placeholder={l.addQualification}
+                value={newQualification}
+                onChange={(e) => setNewQualification(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddQualification()}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleAddQualification} disabled={!newQualification.trim()}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex gap-2 justify-end pt-2 border-t">
+              <Button size="sm" variant="outline" onClick={handleCancelQualifications}>
+                <X className="h-3.5 w-3.5 mr-1" />
+                {l.cancel}
+              </Button>
+              <Button size="sm" onClick={handleSaveQualifications} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Check className="h-3.5 w-3.5 mr-1" />
+                {l.save}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {qualifications.map((qual, index) => (
+              <li key={index} className="flex gap-3 text-sm">
+                <span className="text-primary font-bold flex-shrink-0">✓</span>
+                <span className="leading-relaxed">{qual}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card className="p-6">

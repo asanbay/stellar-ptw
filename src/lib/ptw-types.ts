@@ -9,6 +9,8 @@ export interface Person {
   role: Role
   email?: string
   phone?: string
+  customDuties?: string[]
+  customQualifications?: string[]
 }
 
 export interface Translation {
