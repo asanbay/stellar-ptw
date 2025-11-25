@@ -2,6 +2,14 @@ export type Language = 'ru' | 'tr' | 'en'
 
 export type Role = 'issuer' | 'supervisor' | 'foreman' | 'worker'
 
+export interface Department {
+  id: string
+  name: string
+  color: string
+  emoji: string
+  description?: string
+}
+
 export interface Person {
   id: string
   name: string
@@ -9,6 +17,7 @@ export interface Person {
   role: Role
   email?: string
   phone?: string
+  departmentId?: string
   customDuties?: string[]
   customQualifications?: string[]
 }

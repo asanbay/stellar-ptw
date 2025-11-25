@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
-import type { Person, Role, Language } from '@/lib/ptw-types'
+import type { Person, Role, Language, Department } from '@/lib/ptw-types'
 import { ROLE_LABELS, PROCEDURE_DUTIES } from '@/lib/ptw-constants'
 
 interface PersonDialogProps {
@@ -14,15 +14,17 @@ interface PersonDialogProps {
   onSave: (person: Partial<Person>) => void
   person?: Person
   language: Language
+  departments: Department[]
 }
 
-export function PersonDialog({ open, onOpenChange, onSave, person, language }: PersonDialogProps) {
+export function PersonDialog({ open, onOpenChange, onSave, person, language, departments }: PersonDialogProps) {
   const [formData, setFormData] = useState<Partial<Person>>({
     name: '',
     position: '',
     role: 'worker',
     email: '',
     phone: '',
+    departmentId: undefined,
   })
 
   useEffect(() => {
@@ -35,6 +37,7 @@ export function PersonDialog({ open, onOpenChange, onSave, person, language }: P
         role: 'worker',
         email: '',
         phone: '',
+        departmentId: undefined,
       })
     }
   }, [person, open])
@@ -53,9 +56,12 @@ export function PersonDialog({ open, onOpenChange, onSave, person, language }: P
       name: 'ФИО',
       position: 'Должность',
       role: 'Роль',
+      department: 'Отдел',
       email: 'Email',
       phone: 'Телефон',
       selectRole: 'Выберите роль',
+      selectDepartment: 'Выберите отдел',
+      noDepartment: 'Без отдела',
       dutiesPreview: 'Обязанности (автоматически определяются):',
       cancel: 'Отмена',
       save: 'Сохранить',
@@ -65,9 +71,12 @@ export function PersonDialog({ open, onOpenChange, onSave, person, language }: P
       name: 'Ad Soyad',
       position: 'Pozisyon',
       role: 'Rol',
+      department: 'Departman',
       email: 'Email',
       phone: 'Telefon',
       selectRole: 'Rol Seçin',
+      selectDepartment: 'Departman Seçin',
+      noDepartment: 'Departmansız',
       dutiesPreview: 'Yükümlülükler (otomatik belirlenir):',
       cancel: 'İptal',
       save: 'Kaydet',
@@ -77,9 +86,12 @@ export function PersonDialog({ open, onOpenChange, onSave, person, language }: P
       name: 'Full Name',
       position: 'Position',
       role: 'Role',
+      department: 'Department',
       email: 'Email',
       phone: 'Phone',
       selectRole: 'Select Role',
+      selectDepartment: 'Select Department',
+      noDepartment: 'No Department',
       dutiesPreview: 'Duties (automatically determined):',
       cancel: 'Cancel',
       save: 'Save',
@@ -131,6 +143,28 @@ export function PersonDialog({ open, onOpenChange, onSave, person, language }: P
               </SelectContent>
             </Select>
           </div>
+
+          {departments.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="department">{l.department}</Label>
+              <Select 
+                value={formData.departmentId || 'none'} 
+                onValueChange={(value) => setFormData({ ...formData, departmentId: value === 'none' ? undefined : value })}
+              >
+                <SelectTrigger id="department">
+                  <SelectValue placeholder={l.selectDepartment} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{l.noDepartment}</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.emoji} {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="email">{l.email}</Label>

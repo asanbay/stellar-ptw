@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import type { Person, Language } from '@/lib/ptw-types'
+import type { Person, Language, Department } from '@/lib/ptw-types'
 import { ROLE_COLORS, ROLE_LABELS, PROCEDURE_DUTIES, AUTO_QUALIFICATIONS, AUTO_ORDER_TYPES } from '@/lib/ptw-constants'
 import { getInitials } from '@/lib/ptw-utils'
 
@@ -12,19 +12,21 @@ interface PersonProfileProps {
   person: Person
   language: Language
   isAdmin: boolean
+  departments: Department[]
   onEdit: (person: Person) => void
   onDelete: (id: string) => void
   onUpdateDuties?: (personId: string, duties: string[]) => void
   onUpdateQualifications?: (personId: string, qualifications: string[]) => void
 }
 
-export function PersonProfile({ person, language, isAdmin, onEdit, onDelete, onUpdateDuties, onUpdateQualifications }: PersonProfileProps) {
+export function PersonProfile({ person, language, isAdmin, departments, onEdit, onDelete, onUpdateDuties, onUpdateQualifications }: PersonProfileProps) {
   const defaultDuties = PROCEDURE_DUTIES[person.role][language]
   const defaultQualifications = AUTO_QUALIFICATIONS[person.role][language]
   const orderTypes = AUTO_ORDER_TYPES[person.role]
 
   const duties = person.customDuties || defaultDuties
   const qualifications = person.customQualifications || defaultQualifications
+  const department = departments.find((d) => d.id === person.departmentId)
 
   const [editingDuties, setEditingDuties] = useState(false)
   const [editingQualifications, setEditingQualifications] = useState(false)
@@ -163,16 +165,30 @@ export function PersonProfile({ person, language, isAdmin, onEdit, onDelete, onU
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold mb-2">{person.name}</h2>
-            <Badge
-              className="mb-2 font-semibold"
-              style={{
-                backgroundColor: `color-mix(in oklch, ${ROLE_COLORS[person.role]} 20%, transparent)`,
-                color: ROLE_COLORS[person.role],
-                borderColor: ROLE_COLORS[person.role],
-              }}
-            >
-              {ROLE_LABELS[person.role][language]}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <Badge
+                className="font-semibold"
+                style={{
+                  backgroundColor: `color-mix(in oklch, ${ROLE_COLORS[person.role]} 20%, transparent)`,
+                  color: ROLE_COLORS[person.role],
+                  borderColor: ROLE_COLORS[person.role],
+                }}
+              >
+                {ROLE_LABELS[person.role][language]}
+              </Badge>
+              {department && (
+                <Badge
+                  className="font-semibold"
+                  style={{
+                    backgroundColor: `color-mix(in oklch, ${department.color} 20%, transparent)`,
+                    color: department.color,
+                    borderColor: department.color,
+                  }}
+                >
+                  {department.emoji} {department.name}
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground text-sm">{person.position}</p>
             {(person.email || person.phone) && (
               <div className="flex flex-wrap gap-3 mt-3 text-sm">

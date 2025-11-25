@@ -11,7 +11,8 @@ import { PersonDialog } from '@/components/PersonDialog'
 import { ImportPersonnelDialog } from '@/components/ImportPersonnelDialog'
 import { InfoBoard } from '@/components/InfoBoard'
 import { LoginDialog } from '@/components/LoginDialog'
-import type { Person, Language } from '@/lib/ptw-types'
+import { DepartmentsTab } from '@/components/DepartmentsTab'
+import type { Person, Language, Department } from '@/lib/ptw-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
 import { THEMES } from '@/lib/themes'
@@ -24,6 +25,30 @@ const DocumentsTab = lazy(() => import('@/components/DocumentsTab').then(m => ({
 const PTWTab = lazy(() => import('@/components/PTWTab').then(m => ({ default: m.PTWTab })))
 const CombinedWorksTab = lazy(() => import('@/components/CombinedWorksTab').then(m => ({ default: m.CombinedWorksTab })))
 
+const INITIAL_DEPARTMENTS: Department[] = [
+  {
+    id: 'dept-1',
+    name: 'Служба ОТ и ПБ',
+    emoji: '🛡️',
+    color: 'oklch(0.55 0.22 25)',
+    description: 'Отдел охраны труда и промышленной безопасности',
+  },
+  {
+    id: 'dept-2',
+    name: 'Производственный отдел',
+    emoji: '⚙️',
+    color: 'oklch(0.60 0.15 220)',
+    description: 'Основное производство и монтажные работы',
+  },
+  {
+    id: 'dept-3',
+    name: 'Техническая служба',
+    emoji: '🔧',
+    color: 'oklch(0.65 0.18 145)',
+    description: 'Техническое обслуживание и ремонт',
+  },
+]
+
 const INITIAL_PERSONS: Person[] = [
   {
     id: '1',
@@ -32,6 +57,7 @@ const INITIAL_PERSONS: Person[] = [
     role: 'issuer',
     email: 'l.fayzalieva@stellar.com',
     phone: '+79991234567',
+    departmentId: 'dept-1',
   },
   {
     id: '2',
@@ -40,6 +66,7 @@ const INITIAL_PERSONS: Person[] = [
     role: 'supervisor',
     email: 'm.kucukyilmaz@stellar.com',
     phone: '+905551234567',
+    departmentId: 'dept-2',
   },
   {
     id: '3',
@@ -48,6 +75,7 @@ const INITIAL_PERSONS: Person[] = [
     role: 'foreman',
     email: 'i.petrov@stellar.com',
     phone: '+79991234568',
+    departmentId: 'dept-2',
   },
   {
     id: '4',
@@ -56,11 +84,13 @@ const INITIAL_PERSONS: Person[] = [
     role: 'worker',
     email: 's.sidorov@stellar.com',
     phone: '+79991234569',
+    departmentId: 'dept-3',
   },
 ]
 
 function App() {
   const [persons, setPersons] = useKV<Person[]>('ptw-persons', INITIAL_PERSONS)
+  const [departments, setDepartments] = useKV<Department[]>('ptw-departments', INITIAL_DEPARTMENTS)
   const { language, setLanguage } = useLanguage()
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -159,6 +189,29 @@ function App() {
     toast.success(language === 'ru' ? `✅ Импортировано ${importedPersons.length} сотрудников` : language === 'tr' ? `✅ ${importedPersons.length} çalışan içe aktarıldı` : `✅ Imported ${importedPersons.length} personnel`)
   }
 
+  const handleAddDepartment = (deptData: Partial<Department>) => {
+    const newDepartment: Department = {
+      id: crypto.randomUUID(),
+      name: deptData.name!,
+      color: deptData.color!,
+      emoji: deptData.emoji!,
+      description: deptData.description,
+    }
+    setDepartments((current) => [...(current || []), newDepartment])
+    toast.success(language === 'ru' ? '✅ Отдел добавлен' : language === 'tr' ? '✅ Departman eklendi' : '✅ Department added')
+  }
+
+  const handleEditDepartment = (id: string, deptData: Partial<Department>) => {
+    setDepartments((current) => (current || []).map((d) => (d.id === id ? { ...d, ...deptData } : d)))
+    toast.success(language === 'ru' ? '✅ Отдел обновлен' : language === 'tr' ? '✅ Departman güncellendi' : '✅ Department updated')
+  }
+
+  const handleDeleteDepartment = (id: string) => {
+    setDepartments((current) => (current || []).filter((d) => d.id !== id))
+    setPersons((current) => (current || []).map((p) => (p.departmentId === id ? { ...p, departmentId: undefined } : p)))
+    toast.success(language === 'ru' ? '✅ Отдел удален' : language === 'tr' ? '✅ Departman silindi' : '✅ Department deleted')
+  }
+
   const labels = {
     ru: { 
       appTitle: 'Stellar PTW', 
@@ -166,6 +219,7 @@ function App() {
         personnel: 'Профиль', 
         permits: 'Наряды-допуски',
         combined: 'Совмещенные',
+        departments: 'Отделы',
         process: 'Процесс', 
         roles: 'Роли', 
         rules: 'Правила', 
@@ -186,6 +240,7 @@ function App() {
         personnel: 'Profil', 
         permits: 'İş İzinleri',
         combined: 'Birleştirilmiş',
+        departments: 'Departmanlar',
         process: 'Süreç', 
         roles: 'Roller', 
         rules: 'Kurallar', 
@@ -206,6 +261,7 @@ function App() {
         personnel: 'Profile', 
         permits: 'Permits',
         combined: 'Combined',
+        departments: 'Departments',
         process: 'Process', 
         roles: 'Roles', 
         rules: 'Rules', 
@@ -317,7 +373,7 @@ function App() {
 
       <div className="flex-1 flex overflow-hidden max-w-[1800px] mx-auto w-full">
         <aside className="w-80 flex-shrink-0 hidden md:flex">
-          <PersonnelSidebar persons={allPersons} selectedId={selectedPersonId} onSelectPerson={setSelectedPersonId} language={language} />
+          <PersonnelSidebar persons={allPersons} departments={departments || []} selectedId={selectedPersonId} onSelectPerson={setSelectedPersonId} language={language} />
         </aside>
 
         <main className="flex-1 flex flex-col overflow-hidden">
@@ -332,6 +388,9 @@ function App() {
                 </TabsTrigger>
                 <TabsTrigger value="combined" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
                   🔗 {l.tabs.combined}
+                </TabsTrigger>
+                <TabsTrigger value="departments" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  🏢 {l.tabs.departments}
                 </TabsTrigger>
                 <TabsTrigger value="process" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
                   ⚙️ {l.tabs.process}
@@ -362,7 +421,8 @@ function App() {
                       <PersonProfile 
                         person={selectedPerson} 
                         language={language} 
-                        isAdmin={isAdminMode} 
+                        isAdmin={isAdminMode}
+                        departments={departments || []}
                         onEdit={handleEditPerson} 
                         onDelete={handleDeletePerson}
                         onUpdateDuties={handleUpdateDuties}
@@ -391,6 +451,18 @@ function App() {
                 <Suspense fallback={<LoadingFallback />}>
                   <CombinedWorksTab language={language} isAdmin={isAdminMode} persons={allPersons} />
                 </Suspense>
+              </TabsContent>
+
+              <TabsContent value="departments" className="mt-0">
+                <DepartmentsTab
+                  departments={departments || []}
+                  persons={allPersons}
+                  language={language}
+                  isAdmin={isAdminMode}
+                  onAddDepartment={handleAddDepartment}
+                  onEditDepartment={handleEditDepartment}
+                  onDeleteDepartment={handleDeleteDepartment}
+                />
               </TabsContent>
 
               <TabsContent value="process" className="mt-0">
@@ -430,7 +502,7 @@ function App() {
       <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} onLogin={handleAdminLogin} language={language} />
       {isAdminMode && (
         <>
-          <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} />
+          <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} departments={departments || []} />
           <ImportPersonnelDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} onImport={handleImportPersons} language={language} />
         </>
       )}
