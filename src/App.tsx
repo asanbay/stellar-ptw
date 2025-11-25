@@ -15,7 +15,10 @@ import { AnalyticsTab } from '@/components/AnalyticsTab'
 import { DocumentsTab } from '@/components/DocumentsTab'
 import { InfoBoard } from '@/components/InfoBoard'
 import { LoginDialog } from '@/components/LoginDialog'
+import { PTWTab } from '@/components/PTWTab'
+import { CombinedWorksTab } from '@/components/CombinedWorksTab'
 import type { Person, Language } from '@/lib/ptw-types'
+import type { PTWForm } from '@/lib/ptw-form-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
 import { THEMES } from '@/lib/themes'
@@ -165,7 +168,16 @@ function App() {
   const labels = {
     ru: { 
       appTitle: 'Stellar PTW', 
-      tabs: { personnel: 'Профиль', process: 'Процесс', roles: 'Роли', rules: 'Правила', analytics: 'Аналитика', docs: 'Документы' }, 
+      tabs: { 
+        personnel: 'Профиль', 
+        permits: 'Наряды-допуски',
+        combined: 'Совмещенные',
+        process: 'Процесс', 
+        roles: 'Роли', 
+        rules: 'Правила', 
+        analytics: 'Аналитика', 
+        docs: 'Документы' 
+      }, 
       emptyTitle: 'Выберите сотрудника', 
       emptyDesc: 'Нажмите на сотрудника слева для просмотра деталей',
       adminMode: 'Админ',
@@ -175,7 +187,16 @@ function App() {
     },
     tr: { 
       appTitle: 'Stellar PTW', 
-      tabs: { personnel: 'Profil', process: 'Süreç', roles: 'Roller', rules: 'Kurallar', analytics: 'Analiz', docs: 'Belgeler' }, 
+      tabs: { 
+        personnel: 'Profil', 
+        permits: 'İş İzinleri',
+        combined: 'Birleştirilmiş',
+        process: 'Süreç', 
+        roles: 'Roller', 
+        rules: 'Kurallar', 
+        analytics: 'Analiz', 
+        docs: 'Belgeler' 
+      }, 
       emptyTitle: 'Çalışan Seçin', 
       emptyDesc: 'Detayları görmek için soldaki bir çalışana tıklayın',
       adminMode: 'Yönetici',
@@ -185,7 +206,16 @@ function App() {
     },
     en: { 
       appTitle: 'Stellar PTW', 
-      tabs: { personnel: 'Profile', process: 'Process', roles: 'Roles', rules: 'Rules', analytics: 'Analytics', docs: 'Documents' }, 
+      tabs: { 
+        personnel: 'Profile', 
+        permits: 'Permits',
+        combined: 'Combined',
+        process: 'Process', 
+        roles: 'Roles', 
+        rules: 'Rules', 
+        analytics: 'Analytics', 
+        docs: 'Documents' 
+      }, 
       emptyTitle: 'Select Personnel', 
       emptyDesc: 'Click on a person in the sidebar to view details',
       adminMode: 'Admin',
@@ -285,8 +315,14 @@ function App() {
                 <TabsTrigger value="personnel" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
                   👤 {l.tabs.personnel}
                 </TabsTrigger>
+                <TabsTrigger value="permits" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  📋 {l.tabs.permits}
+                </TabsTrigger>
+                <TabsTrigger value="combined" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  🔗 {l.tabs.combined}
+                </TabsTrigger>
                 <TabsTrigger value="process" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
-                  📋 {l.tabs.process}
+                  ⚙️ {l.tabs.process}
                 </TabsTrigger>
                 <TabsTrigger value="roles" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
                   🎭 {l.tabs.roles}
@@ -331,6 +367,14 @@ function App() {
                     )}
                   </div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="permits" className="mt-0">
+                <PTWTab language={language} isAdmin={isAdminMode} persons={allPersons} />
+              </TabsContent>
+
+              <TabsContent value="combined" className="mt-0">
+                <CombinedWorksTab language={language} isAdmin={isAdminMode} persons={allPersons} />
               </TabsContent>
 
               <TabsContent value="process" className="mt-0">

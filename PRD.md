@@ -12,6 +12,20 @@ A comprehensive Permit-to-Work (PTW) personnel management system that enables or
 
 ## Essential Features
 
+### PTW Creation and Management
+- **Functionality**: Create, edit, and track Permits to Work (PTW/НД) with different types (Height, Hot Work, Confined Space, Earthwork, Hazardous Factors)
+- **Purpose**: Digitize and manage work permits according to STE-PR-10-05-Rev2 procedure
+- **Trigger**: Admin clicks "Create PTW" button
+- **Progression**: Select work type → Fill work details → Assign personnel (Issuer, Supervisor, Foreman) → Set dates → Save draft → Issue permit → Track status
+- **Success criteria**: PTW forms are created with unique numbers, stored persistently, filtered by type/status, and follow the 7-day validity rule
+
+### Combined Works Journal
+- **Functionality**: Track and coordinate multiple simultaneous works on the same site (STE-LOG-10-27)
+- **Purpose**: Ensure safe coordination when multiple teams/organizations work in overlapping zones
+- **Trigger**: Admin adds entry when combined works are scheduled
+- **Progression**: Specify date and location → List PTW numbers → Assign coordinator → Document safety measures → Save entry
+- **Success criteria**: Combined works are logged, linked to PTWs, visible to all users, coordinator identified
+
 ### Role-Based Authentication
 - **Functionality**: Admin/User mode switching with password authentication (password: "123"), separate access levels
 - **Purpose**: Protect sensitive personnel data while allowing authorized viewing and editing
@@ -54,6 +68,13 @@ A comprehensive Permit-to-Work (PTW) personnel management system that enables or
 - **Progression**: Enter criteria → List updates instantly → Select person → View details
 - **Success criteria**: Fast filtering with immediate results
 
+### PTW Status Workflow
+- **Functionality**: Track PTW lifecycle through statuses: Draft → Issued → In Progress → Completed → Closed
+- **Purpose**: Maintain compliance and audit trail for all work permits
+- **Trigger**: Admin changes status based on work progress
+- **Progression**: Create draft → Issue to supervisor → Start work → Complete work → Close permit
+- **Success criteria**: Status changes are tracked with timestamps, cannot skip required steps, closed permits are archived
+
 ## Edge Case Handling
 - **Unauthenticated Users**: Show full read-only interface in user mode; hide all edit/delete controls
 - **Wrong Password**: Show error message, prevent admin mode access
@@ -62,6 +83,10 @@ A comprehensive Permit-to-Work (PTW) personnel management system that enables or
 - **Concurrent Edits**: Use KV store for data consistency
 - **Network Issues**: Queue changes and retry on reconnection
 - **Empty Announcements**: Show friendly empty state encouraging first post
+- **PTW Expiration**: Warn when PTWs approach 7-day validity limit
+- **Team Size Limits**: Validate max 20 people per PTW (require HSE approval for more)
+- **Duplicate PTW Numbers**: Auto-generate unique numbers based on year and sequence
+- **Missing Personnel Assignments**: Validate required roles before issuing PTW
 
 ## Design Direction
 The design should feel authoritative and industrial-professional, balancing the seriousness of safety management with modern usability—a clean, structured interface that prioritizes information clarity over decorative elements.
@@ -102,25 +127,30 @@ Animations should be minimal and functional, respecting the professional context
 
 ## Component Selection
 - **Components**:
-  - Tabs for main navigation (Personnel, Process, Roles, Rules, Analytics, Documents)
-  - Card for personnel profiles, procedure sections, and information board
-  - Dialog for add/edit personnel forms and admin login
-  - Badge for role indicators and permit types
+  - Tabs for main navigation (Personnel, Permits, Combined Works, Process, Roles, Rules, Analytics, Documents)
+  - Card for personnel profiles, PTW forms, procedure sections, and information board
+  - Dialog for add/edit personnel, PTW creation/editing, and admin login
+  - Badge for role indicators, permit types, and status indicators
   - Button with primary/secondary/destructive variants
-  - Input for text fields, search, and password entry
-  - Textarea for announcement content
-  - Select for role and language selection
-  - Scroll Area for long procedure lists
+  - Input for text fields, search, dates, and password entry
+  - Textarea for work descriptions, announcements, and notes
+  - Select for role, PTW type, status, and language selection
+  - Checkbox for combined works flag and team member selection
+  - Scroll Area for long procedure lists and PTW details
   - Avatar for personnel identification
   - Separator for section division
 
 - **Customizations**:
   - Custom role badges with specific colors (Issuer: Purple, Supervisor: Pink, Foreman: Amber, Worker: Indigo)
+  - PTW status badges with color coding (Draft: Gray, Issued: Blue, In Progress: Green, Completed: Purple, Closed: Slate, Cancelled: Red)
+  - PTW type badges showing document codes (STE-PTW-10-01 through 10-05)
   - Personnel sidebar with search and filter
   - Procedure sections with timeline layout
   - Stats cards for analytics dashboard
   - Information board with admin edit controls and chronological display
   - Admin/User mode toggle buttons with password protection
+  - Combined works journal with multi-PTW linking
+  - PTW form with role-based personnel assignment
 
 - **States**:
   - Buttons: Admin-only buttons hidden for non-admins; hover states for interactive feedback
@@ -131,18 +161,24 @@ Animations should be minimal and functional, respecting the professional context
   - UserPlus (Add personnel)
   - PencilSimple (Edit)
   - Trash (Delete)
-  - Users (User mode)
+  - Users (User mode / Combined works)
   - User (Switch to user mode)
-  - FileText (Process/Documents)
+  - FileText (Process/Documents/PTW)
   - ShieldCheck (Safety/Rules)
   - ChartBar (Analytics)
   - Globe (Language)
   - LockKey (Admin indicator/login)
   - SignIn (Login action)
   - SignOut (Logout)
-  - Plus (Add announcement)
-  - Check (Save)
-  - X (Cancel)
+  - Plus (Add announcement/PTW/entry)
+  - Check (Save/Approve)
+  - X (Cancel/Close)
+  - Eye (View details)
+  - Clock (In progress status)
+  - CheckCircle (Completed status)
+  - XCircle (Cancelled status)
+  - CalendarBlank (Date)
+  - MapPin (Location)
 
 - **Spacing**:
   - Container padding: p-4 on mobile, p-6 on desktop
