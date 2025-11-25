@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -27,12 +27,14 @@ export function PersonnelSidebar({ persons, selectedId, onSelectPerson, language
     en: { all: 'All', issuer: 'Issuers', supervisor: 'Supervisors', foreman: 'Foremen', worker: 'Workers' },
   }
 
-  const filteredPersons = persons.filter((person) => {
-    const matchesSearch =
-      person.name.toLowerCase().includes(searchQuery.toLowerCase()) || person.position.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesFilter = filter === 'all' || person.role === filter
-    return matchesSearch && matchesFilter
-  })
+  const filteredPersons = useMemo(() => {
+    return persons.filter((person) => {
+      const matchesSearch =
+        person.name.toLowerCase().includes(searchQuery.toLowerCase()) || person.position.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesFilter = filter === 'all' || person.role === filter
+      return matchesSearch && matchesFilter
+    })
+  }, [persons, searchQuery, filter])
 
   return (
     <div className="flex flex-col h-full border-r bg-card">

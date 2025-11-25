@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { UserPlus, Download, Globe, LockKey, User, Palette } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
@@ -8,20 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PersonnelSidebar } from '@/components/PersonnelSidebar'
 import { PersonProfile } from '@/components/PersonProfile'
 import { PersonDialog } from '@/components/PersonDialog'
-import { ProcessTab } from '@/components/ProcessTab'
-import { RolesTab } from '@/components/RolesTab'
-import { RulesTab } from '@/components/RulesTab'
-import { AnalyticsTab } from '@/components/AnalyticsTab'
-import { DocumentsTab } from '@/components/DocumentsTab'
 import { InfoBoard } from '@/components/InfoBoard'
 import { LoginDialog } from '@/components/LoginDialog'
-import { PTWTab } from '@/components/PTWTab'
-import { CombinedWorksTab } from '@/components/CombinedWorksTab'
 import type { Person, Language } from '@/lib/ptw-types'
-import type { PTWForm } from '@/lib/ptw-form-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
 import { THEMES } from '@/lib/themes'
+
+const ProcessTab = lazy(() => import('@/components/ProcessTab').then(m => ({ default: m.ProcessTab })))
+const RolesTab = lazy(() => import('@/components/RolesTab').then(m => ({ default: m.RolesTab })))
+const RulesTab = lazy(() => import('@/components/RulesTab').then(m => ({ default: m.RulesTab })))
+const AnalyticsTab = lazy(() => import('@/components/AnalyticsTab').then(m => ({ default: m.AnalyticsTab })))
+const DocumentsTab = lazy(() => import('@/components/DocumentsTab').then(m => ({ default: m.DocumentsTab })))
+const PTWTab = lazy(() => import('@/components/PTWTab').then(m => ({ default: m.PTWTab })))
+const CombinedWorksTab = lazy(() => import('@/components/CombinedWorksTab').then(m => ({ default: m.CombinedWorksTab })))
 
 const INITIAL_PERSONS: Person[] = [
   {
@@ -214,6 +214,15 @@ function App() {
 
   const l = labels[language]
 
+  const LoadingFallback = () => (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="text-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+        <p className="mt-4 text-muted-foreground">{language === 'ru' ? 'Загрузка...' : language === 'tr' ? 'Yükleniyor...' : 'Loading...'}</p>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Toaster position="top-center" />
@@ -357,31 +366,45 @@ function App() {
               </TabsContent>
 
               <TabsContent value="permits" className="mt-0">
-                <PTWTab language={language} isAdmin={isAdminMode} persons={allPersons} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <PTWTab language={language} isAdmin={isAdminMode} persons={allPersons} />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="combined" className="mt-0">
-                <CombinedWorksTab language={language} isAdmin={isAdminMode} persons={allPersons} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <CombinedWorksTab language={language} isAdmin={isAdminMode} persons={allPersons} />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="process" className="mt-0">
-                <ProcessTab language={language} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <ProcessTab language={language} />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="roles" className="mt-0">
-                <RolesTab persons={allPersons} language={language} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <RolesTab persons={allPersons} language={language} />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="rules" className="mt-0">
-                <RulesTab language={language} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <RulesTab language={language} />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="analytics" className="mt-0">
-                <AnalyticsTab stats={stats} language={language} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <AnalyticsTab stats={stats} language={language} />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="docs" className="mt-0">
-                <DocumentsTab language={language} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <DocumentsTab language={language} />
+                </Suspense>
               </TabsContent>
             </div>
           </Tabs>
