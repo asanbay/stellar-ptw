@@ -78,10 +78,7 @@ export function FAQTab({ language, isAdmin, faqs, onAddFAQ, onEditFAQ, onDeleteF
   }
 
   const handleDelete = (id: string) => {
-    const confirmMsg = language === 'ru' ? 'Вы уверены?' : language === 'tr' ? 'Emin misiniz?' : 'Are you sure?'
-    if (confirm(confirmMsg)) {
-      onDeleteFAQ(id)
-    }
+    onDeleteFAQ(id)
   }
 
   const sortedFAQs = [...faqs].sort((a, b) => a.order - b.order)

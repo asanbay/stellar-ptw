@@ -164,12 +164,9 @@ function App() {
   }
 
   const handleDeletePerson = (id: string) => {
-    const confirmMsg = language === 'ru' ? 'Вы уверены?' : language === 'tr' ? 'Emin misiniz?' : 'Are you sure?'
-    if (confirm(confirmMsg)) {
-      setPersons((current) => (current || []).filter((p) => p.id !== id))
-      setSelectedPersonId(null)
-      toast.success(language === 'ru' ? '✅ Удалено' : language === 'tr' ? '✅ Silindi' : '✅ Deleted')
-    }
+    setPersons((current) => (current || []).filter((p) => p.id !== id))
+    setSelectedPersonId(null)
+    toast.success(language === 'ru' ? '✅ Удалено' : language === 'tr' ? '✅ Silindi' : '✅ Deleted')
   }
 
   const handleExport = () => {

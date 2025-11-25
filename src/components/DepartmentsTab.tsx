@@ -46,19 +46,7 @@ export function DepartmentsTab({
   }
 
   const handleDelete = (id: string) => {
-    const dept = departments.find((d) => d.id === id)
-    const deptPersons = persons.filter((p) => p.departmentId === id)
-    
-    const confirmMsg =
-      language === 'ru'
-        ? `Удалить отдел "${dept?.name}"? ${deptPersons.length > 0 ? `В нем ${deptPersons.length} сотрудников.` : ''}`
-        : language === 'tr'
-        ? `"${dept?.name}" departmanını sil? ${deptPersons.length > 0 ? `${deptPersons.length} çalışan var.` : ''}`
-        : `Delete department "${dept?.name}"? ${deptPersons.length > 0 ? `It has ${deptPersons.length} personnel.` : ''}`
-
-    if (confirm(confirmMsg)) {
-      onDeleteDepartment(id)
-    }
+    onDeleteDepartment(id)
   }
 
   const getDepartmentPersonCount = (deptId: string) => {
