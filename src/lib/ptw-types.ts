@@ -58,3 +58,11 @@ export interface Stats {
   foreman: number
   worker: number
 }
+
+export interface FAQItem {
+  id: string
+  question: Translation
+  answer: Translation
+  category?: string
+  order: number
+}

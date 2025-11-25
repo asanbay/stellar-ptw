@@ -12,10 +12,12 @@ import { ImportPersonnelDialog } from '@/components/ImportPersonnelDialog'
 import { InfoBoard } from '@/components/InfoBoard'
 import { LoginDialog } from '@/components/LoginDialog'
 import { DepartmentsTab } from '@/components/DepartmentsTab'
-import type { Person, Language, Department } from '@/lib/ptw-types'
+import { FAQTab } from '@/components/FAQTab'
+import type { Person, Language, Department, FAQItem } from '@/lib/ptw-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
 import { THEMES } from '@/lib/themes'
+import { INITIAL_FAQS } from '@/lib/faq-data'
 
 const ProcessTab = lazy(() => import('@/components/ProcessTab').then(m => ({ default: m.ProcessTab })))
 const RolesTab = lazy(() => import('@/components/RolesTab').then(m => ({ default: m.RolesTab })))
@@ -91,6 +93,7 @@ const INITIAL_PERSONS: Person[] = [
 function App() {
   const [persons, setPersons] = useKV<Person[]>('ptw-persons', INITIAL_PERSONS)
   const [departments, setDepartments] = useKV<Department[]>('ptw-departments', INITIAL_DEPARTMENTS)
+  const [faqs, setFaqs] = useKV<FAQItem[]>('ptw-faqs', INITIAL_FAQS)
   const { language, setLanguage } = useLanguage()
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -212,6 +215,28 @@ function App() {
     toast.success(language === 'ru' ? '✅ Отдел удален' : language === 'tr' ? '✅ Departman silindi' : '✅ Department deleted')
   }
 
+  const handleAddFAQ = (faqData: Partial<FAQItem>) => {
+    const newFAQ: FAQItem = {
+      id: crypto.randomUUID(),
+      question: faqData.question!,
+      answer: faqData.answer!,
+      category: faqData.category,
+      order: faqData.order ?? (faqs || []).length,
+    }
+    setFaqs((current) => [...(current || []), newFAQ])
+    toast.success(language === 'ru' ? '✅ Вопрос добавлен' : language === 'tr' ? '✅ Soru eklendi' : '✅ Question added')
+  }
+
+  const handleEditFAQ = (id: string, faqData: Partial<FAQItem>) => {
+    setFaqs((current) => (current || []).map((f) => (f.id === id ? { ...f, ...faqData } : f)))
+    toast.success(language === 'ru' ? '✅ Вопрос обновлен' : language === 'tr' ? '✅ Soru güncellendi' : '✅ Question updated')
+  }
+
+  const handleDeleteFAQ = (id: string) => {
+    setFaqs((current) => (current || []).filter((f) => f.id !== id))
+    toast.success(language === 'ru' ? '✅ Вопрос удален' : language === 'tr' ? '✅ Soru silindi' : '✅ Question deleted')
+  }
+
   const labels = {
     ru: { 
       appTitle: 'Stellar PTW', 
@@ -222,7 +247,8 @@ function App() {
         departments: 'Отделы',
         process: 'Процесс', 
         roles: 'Роли', 
-        rules: 'Правила', 
+        rules: 'Правила',
+        faq: 'FAQ',
         analytics: 'Аналитика', 
         docs: 'Документы' 
       }, 
@@ -243,7 +269,8 @@ function App() {
         departments: 'Departmanlar',
         process: 'Süreç', 
         roles: 'Roller', 
-        rules: 'Kurallar', 
+        rules: 'Kurallar',
+        faq: 'SSS',
         analytics: 'Analiz', 
         docs: 'Belgeler' 
       }, 
@@ -264,7 +291,8 @@ function App() {
         departments: 'Departments',
         process: 'Process', 
         roles: 'Roles', 
-        rules: 'Rules', 
+        rules: 'Rules',
+        faq: 'FAQ',
         analytics: 'Analytics', 
         docs: 'Documents' 
       }, 
@@ -401,6 +429,9 @@ function App() {
                 <TabsTrigger value="rules" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
                   📏 {l.tabs.rules}
                 </TabsTrigger>
+                <TabsTrigger value="faq" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
+                  ❓ {l.tabs.faq}
+                </TabsTrigger>
                 <TabsTrigger value="analytics" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
                   📊 {l.tabs.analytics}
                 </TabsTrigger>
@@ -481,6 +512,17 @@ function App() {
                 <Suspense fallback={<LoadingFallback />}>
                   <RulesTab language={language} />
                 </Suspense>
+              </TabsContent>
+
+              <TabsContent value="faq" className="mt-0">
+                <FAQTab
+                  language={language}
+                  isAdmin={isAdminMode}
+                  faqs={faqs || []}
+                  onAddFAQ={handleAddFAQ}
+                  onEditFAQ={handleEditFAQ}
+                  onDeleteFAQ={handleDeleteFAQ}
+                />
               </TabsContent>
 
               <TabsContent value="analytics" className="mt-0">
