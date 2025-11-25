@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { UserPlus, Download, Globe, LockKey, User, Palette } from '@phosphor-icons/react'
+import { UserPlus, Download, Globe, LockKey, User, Palette, Upload } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PersonnelSidebar } from '@/components/PersonnelSidebar'
 import { PersonProfile } from '@/components/PersonProfile'
 import { PersonDialog } from '@/components/PersonDialog'
+import { ImportPersonnelDialog } from '@/components/ImportPersonnelDialog'
 import { InfoBoard } from '@/components/InfoBoard'
 import { LoginDialog } from '@/components/LoginDialog'
 import type { Person, Language } from '@/lib/ptw-types'
@@ -63,6 +64,7 @@ function App() {
   const { language, setLanguage } = useLanguage()
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | undefined>()
   const [userMode, setUserMode] = useState<'user' | 'admin'>('user')
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
@@ -152,6 +154,11 @@ function App() {
     toast.success(language === 'ru' ? '✅ Квалификация обновлена' : language === 'tr' ? '✅ Nitelikler güncellendi' : '✅ Qualifications updated')
   }
 
+  const handleImportPersons = (importedPersons: Person[]) => {
+    setPersons((current) => [...(current || []), ...importedPersons])
+    toast.success(language === 'ru' ? `✅ Импортировано ${importedPersons.length} сотрудников` : language === 'tr' ? `✅ ${importedPersons.length} çalışan içe aktarıldı` : `✅ Imported ${importedPersons.length} personnel`)
+  }
+
   const labels = {
     ru: { 
       appTitle: 'Stellar PTW', 
@@ -171,6 +178,7 @@ function App() {
       userMode: 'Пользователь',
       logout: 'Выйти',
       theme: 'Тема',
+      import: 'Импорт',
     },
     tr: { 
       appTitle: 'Stellar PTW', 
@@ -190,6 +198,7 @@ function App() {
       userMode: 'Kullanıcı',
       logout: 'Çıkış',
       theme: 'Tema',
+      import: 'İçe Aktar',
     },
     en: { 
       appTitle: 'Stellar PTW', 
@@ -209,6 +218,7 @@ function App() {
       userMode: 'User',
       logout: 'Logout',
       theme: 'Theme',
+      import: 'Import',
     },
   }
 
@@ -290,10 +300,16 @@ function App() {
               {language === 'ru' ? 'Экспорт' : language === 'tr' ? 'Dışa Aktar' : 'Export'}
             </Button>
             {isAdminMode && (
-              <Button size="sm" onClick={handleAddPerson} className="font-semibold bg-accent text-accent-foreground hover:bg-accent/90">
-                <UserPlus className="h-4 w-4 mr-1" />
-                {language === 'ru' ? 'Добавить' : language === 'tr' ? 'Ekle' : 'Add'}
-              </Button>
+              <>
+                <Button size="sm" onClick={() => setImportDialogOpen(true)} variant="secondary" className="font-semibold">
+                  <Upload className="h-4 w-4 mr-1" />
+                  {l.import}
+                </Button>
+                <Button size="sm" onClick={handleAddPerson} className="font-semibold bg-accent text-accent-foreground hover:bg-accent/90">
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  {language === 'ru' ? 'Добавить' : language === 'tr' ? 'Ekle' : 'Add'}
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -412,7 +428,12 @@ function App() {
       </div>
 
       <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} onLogin={handleAdminLogin} language={language} />
-      {isAdminMode && <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} />}
+      {isAdminMode && (
+        <>
+          <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} />
+          <ImportPersonnelDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} onImport={handleImportPersons} language={language} />
+        </>
+      )}
     </div>
   )
 }
