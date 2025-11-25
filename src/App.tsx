@@ -64,7 +64,6 @@ function App() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | undefined>()
-  const [isAdmin, setIsAdmin] = useState(false)
   const [userMode, setUserMode] = useState<'user' | 'admin'>('user')
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
   const [currentTheme, setCurrentTheme] = useKV<string>('ptw-theme', 'stellar')
@@ -80,18 +79,6 @@ function App() {
       })
     }
   }, [currentTheme])
-
-  useEffect(() => {
-    async function checkAdmin() {
-      try {
-        const user = await window.spark.user()
-        setIsAdmin(user?.isOwner || false)
-      } catch {
-        setIsAdmin(false)
-      }
-    }
-    checkAdmin()
-  }, [])
 
   const handleSwitchToAdmin = () => {
     setLoginDialogOpen(true)
@@ -236,7 +223,7 @@ function App() {
           <div className="flex items-center gap-2">
             <span className="text-2xl">{THEMES[currentTheme || 'stellar']?.emoji || '⭐'}</span>
             <h1 className="text-xl font-bold">{l.appTitle}</h1>
-            {isAdmin && isAdminMode && (
+            {isAdminMode && (
               <span className="ml-2 px-2 py-0.5 bg-accent text-accent-foreground rounded text-xs font-semibold flex items-center gap-1">
                 <LockKey className="h-3 w-3" />
                 {l.adminMode}
