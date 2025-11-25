@@ -9,7 +9,7 @@ import type { Language } from '@/lib/ptw-types'
 interface LoginDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onLogin: (password: string) => void
+  onLogin: () => void
   language: Language
 }
 
@@ -52,7 +52,7 @@ export function LoginDialog({ open, onOpenChange, onLogin, language }: LoginDial
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (password === '123') {
-      onLogin(password)
+      onLogin()
       setPassword('')
       setError(false)
       onOpenChange(false)
