@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { UserPlus, Download, Globe, LockKey, User, Palette, Upload } from '@phosphor-icons/react'
+import { UserPlus, Download, Globe, LockKey, User, Palette, Upload, Users } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { PersonnelSidebar } from '@/components/PersonnelSidebar'
 import { PersonProfile } from '@/components/PersonProfile'
 import { PersonDialog } from '@/components/PersonDialog'
@@ -18,6 +19,7 @@ import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
 import { THEMES } from '@/lib/themes'
 import { INITIAL_FAQS } from '@/lib/faq-data'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 const ProcessTab = lazy(() => import('@/components/ProcessTab').then(m => ({ default: m.ProcessTab })))
 const RolesTab = lazy(() => import('@/components/RolesTab').then(m => ({ default: m.RolesTab })))
@@ -102,6 +104,8 @@ function App() {
   const [userMode, setUserMode] = useState<'user' | 'admin'>('user')
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
   const [currentTheme, setCurrentTheme] = useKV<string>('ptw-theme', 'stellar')
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     const themeKey = currentTheme || 'stellar'
@@ -166,6 +170,7 @@ function App() {
   const handleDeletePerson = (id: string) => {
     setPersons((current) => (current || []).filter((p) => p.id !== id))
     setSelectedPersonId(null)
+    setMobileSheetOpen(false)
     toast.success(language === 'ru' ? '✅ Удалено' : language === 'tr' ? '✅ Silindi' : '✅ Deleted')
   }
 
@@ -251,11 +256,13 @@ function App() {
       }, 
       emptyTitle: 'Выберите сотрудника', 
       emptyDesc: 'Нажмите на сотрудника слева для просмотра деталей',
+      emptyDescMobile: 'Нажмите кнопку "Персонал" для выбора сотрудника',
       adminMode: 'Админ',
       userMode: 'Пользователь',
       logout: 'Выйти',
       theme: 'Тема',
       import: 'Импорт',
+      personnel: 'Персонал',
     },
     tr: { 
       appTitle: 'Stellar PTW', 
@@ -273,11 +280,13 @@ function App() {
       }, 
       emptyTitle: 'Çalışan Seçin', 
       emptyDesc: 'Detayları görmek için soldaki bir çalışana tıklayın',
+      emptyDescMobile: 'Çalışan seçmek için "Personel" düğmesine tıklayın',
       adminMode: 'Yönetici',
       userMode: 'Kullanıcı',
       logout: 'Çıkış',
       theme: 'Tema',
       import: 'İçe Aktar',
+      personnel: 'Personel',
     },
     en: { 
       appTitle: 'Stellar PTW', 
@@ -295,11 +304,13 @@ function App() {
       }, 
       emptyTitle: 'Select Personnel', 
       emptyDesc: 'Click on a person in the sidebar to view details',
+      emptyDescMobile: 'Click "Personnel" button to select a person',
       adminMode: 'Admin',
       userMode: 'User',
       logout: 'Logout',
       theme: 'Theme',
       import: 'Import',
+      personnel: 'Personnel',
     },
   }
 
@@ -331,6 +342,28 @@ function App() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {isMobile && (
+              <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="secondary" size="sm" className="font-semibold">
+                    <Users className="h-4 w-4 mr-1" />
+                    {l.personnel}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80 p-0">
+                  <PersonnelSidebar 
+                    persons={allPersons} 
+                    departments={departments || []} 
+                    selectedId={selectedPersonId} 
+                    onSelectPerson={(id) => {
+                      setSelectedPersonId(id)
+                      setMobileSheetOpen(false)
+                    }} 
+                    language={language} 
+                  />
+                </SheetContent>
+              </Sheet>
+            )}
             {isAdminMode ? (
               <Button
                 variant="secondary"
@@ -461,7 +494,7 @@ function App() {
                         <div>
                           <div className="text-6xl mb-4">👋</div>
                           <h3 className="text-xl font-bold mb-2">{l.emptyTitle}</h3>
-                          <p className="text-muted-foreground">{l.emptyDesc}</p>
+                          <p className="text-muted-foreground">{isMobile ? l.emptyDescMobile : l.emptyDesc}</p>
                         </div>
                       </div>
                     )}
