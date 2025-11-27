@@ -48,14 +48,14 @@ export function AnalyticsTab({ stats, language }: AnalyticsTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="p-6 text-center border-t-4 border-t-primary">
-          <div className="text-3xl font-extrabold text-primary mb-2">{stats.total}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="p-4 md:p-6 text-center border-t-4 border-t-primary">
+          <div className="text-2xl md:text-3xl font-extrabold text-primary mb-2">{stats.total}</div>
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{l.total}</div>
         </Card>
         {roleStats.map((stat) => (
-          <Card key={stat.key} className="p-6 text-center border-t-4" style={{ borderTopColor: stat.color }}>
-            <div className="text-3xl font-extrabold mb-2" style={{ color: stat.color }}>
+          <Card key={stat.key} className="p-4 md:p-6 text-center border-t-4" style={{ borderTopColor: stat.color }}>
+            <div className="text-2xl md:text-3xl font-extrabold mb-2" style={{ color: stat.color }}>
               {stat.value}
             </div>
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{stat.label}</div>

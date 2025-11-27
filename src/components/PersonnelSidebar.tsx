@@ -63,7 +63,7 @@ export function PersonnelSidebar({ persons, departments, selectedId, onSelectPer
 
   return (
     <div className="flex flex-col h-full border-r bg-card">
-      <div className="p-4 border-b">
+      <div className="p-3 md:p-4 border-b">
         <h2 className="font-semibold text-base mb-3">👥 {language === 'ru' ? 'Персонал' : language === 'tr' ? 'Personel' : 'Personnel'}</h2>
         <div className="relative">
           <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -71,19 +71,19 @@ export function PersonnelSidebar({ persons, departments, selectedId, onSelectPer
             placeholder={language === 'ru' ? 'Поиск...' : language === 'tr' ? 'Ara...' : 'Search...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-10"
           />
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 p-2 border-b">
+      <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/50">
         {(['all', 'issuer', 'supervisor', 'foreman', 'worker'] as FilterRole[]).map((roleFilter) => (
           <Button
             key={roleFilter}
             variant={filter === roleFilter ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setFilter(roleFilter)}
-            className={cn('text-xs h-8 flex-1 min-w-[60px]', filter === roleFilter && 'bg-primary text-primary-foreground')}
+            className={cn('text-xs h-9 flex-1 min-w-[70px] touch-manipulation', filter === roleFilter && 'bg-primary text-primary-foreground')}
           >
             {filterLabels[language][roleFilter]}
           </Button>
@@ -141,18 +141,18 @@ export function PersonnelSidebar({ persons, departments, selectedId, onSelectPer
                     key={person.id}
                     onClick={() => onSelectPerson(person.id)}
                     className={cn(
-                      'w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors',
-                      selectedId === person.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted',
+                      'w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors touch-manipulation active:scale-[0.98]',
+                      selectedId === person.id ? 'bg-primary/10 border border-primary shadow-sm' : 'hover:bg-muted border border-transparent',
                     )}
                   >
                     <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
+                      className="w-11 h-11 md:w-10 md:h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
                       style={{ background: `linear-gradient(135deg, ${ROLE_COLORS[person.role]}, color-mix(in oklch, ${ROLE_COLORS[person.role]} 80%, black))` }}
                     >
                       {getInitials(person.name)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm truncate">{person.name}</div>
+                      <div className="font-semibold text-sm md:text-sm truncate">{person.name}</div>
                       <div className="text-xs text-muted-foreground truncate">{ROLE_LABELS[person.role][language]}</div>
                     </div>
                   </button>
