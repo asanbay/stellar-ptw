@@ -22,4 +22,11 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined // Отключаем разбивку на чанки для Netlify
+      }
+    }
+  }
 });
