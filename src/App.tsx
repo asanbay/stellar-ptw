@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/use-kv'
 import { UserPlus, Download, Globe, LockKey, User, Palette, Upload, Users } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
