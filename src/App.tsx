@@ -21,13 +21,28 @@ import { THEMES } from '@/lib/themes'
 import { INITIAL_FAQS } from '@/lib/faq-data'
 import { useIsMobile } from '@/hooks/use-mobile'
 
-const ProcessTab = lazy(() => import('@/components/ProcessTab').then(m => ({ default: m.ProcessTab })))
-const RolesTab = lazy(() => import('@/components/RolesTab').then(m => ({ default: m.RolesTab })))
-const RulesTab = lazy(() => import('@/components/RulesTab').then(m => ({ default: m.RulesTab })))
-const AnalyticsTab = lazy(() => import('@/components/AnalyticsTab').then(m => ({ default: m.AnalyticsTab })))
-const DocumentsTab = lazy(() => import('@/components/DocumentsTab').then(m => ({ default: m.DocumentsTab })))
-const PTWTab = lazy(() => import('@/components/PTWTab').then(m => ({ default: m.PTWTab })))
-const CombinedWorksTab = lazy(() => import('@/components/CombinedWorksTab').then(m => ({ default: m.CombinedWorksTab })))
+// Lazy loaded components with error handling
+const retryImport = (importFn: () => Promise<any>, retries = 3, delay = 1000): Promise<any> => {
+  return importFn().catch((error) => {
+    if (retries === 0) {
+      console.error('Failed to load module after retries:', error);
+      // Reload page if all retries fail
+      window.location.reload();
+      throw error;
+    }
+    console.warn(`Import failed, retrying... (${retries} attempts left)`);
+    return new Promise(resolve => setTimeout(resolve, delay))
+      .then(() => retryImport(importFn, retries - 1, delay));
+  });
+};
+
+const ProcessTab = lazy(() => retryImport(() => import('@/components/ProcessTab').then(m => ({ default: m.ProcessTab }))))
+const RolesTab = lazy(() => retryImport(() => import('@/components/RolesTab').then(m => ({ default: m.RolesTab }))))
+const RulesTab = lazy(() => retryImport(() => import('@/components/RulesTab').then(m => ({ default: m.RulesTab }))))
+const AnalyticsTab = lazy(() => retryImport(() => import('@/components/AnalyticsTab').then(m => ({ default: m.AnalyticsTab }))))
+const DocumentsTab = lazy(() => retryImport(() => import('@/components/DocumentsTab').then(m => ({ default: m.DocumentsTab }))))
+const PTWTab = lazy(() => retryImport(() => import('@/components/PTWTab').then(m => ({ default: m.PTWTab }))))
+const CombinedWorksTab = lazy(() => retryImport(() => import('@/components/CombinedWorksTab').then(m => ({ default: m.CombinedWorksTab }))))
 
 const INITIAL_DEPARTMENTS: Department[] = [
   {
