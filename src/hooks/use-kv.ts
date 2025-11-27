@@ -1,7 +1,7 @@
 // Polyfill для useKV когда Spark недоступен
 import { useState, useEffect } from 'react';
 
-export function useKV<T>(key: string, initialValue: T): [T, (value: T) => void] {
+export function useKV<T>(key: string, initialValue: T): [T, (value: T | ((prev: T) => T)) => void] {
   // Проверяем доступен ли Spark
   const isSparkAvailable = typeof window !== 'undefined' && 
     window.location.hostname === 'localhost';
@@ -40,5 +40,12 @@ export function useKV<T>(key: string, initialValue: T): [T, (value: T) => void] 
     }
   }, [key, value]);
 
-  return [value, setValue];
+  const updateValue = (next: T | ((prev: T) => T)) => {
+    setValue((prev) => {
+      const resolved = typeof next === 'function' ? (next as (prev: T) => T)(prev) : next;
+      return resolved;
+    });
+  };
+
+  return [value, updateValue];
 }

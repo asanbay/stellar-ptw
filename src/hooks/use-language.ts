@@ -1,4 +1,4 @@
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/use-kv'
 import type { Language, Translation } from '@/lib/ptw-types'
 
 export function useLanguage() {
