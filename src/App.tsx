@@ -17,6 +17,7 @@ import { FAQTab } from '@/components/FAQTab'
 import type { Person, Language, Department, FAQItem } from '@/lib/ptw-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
+import { generateId } from '@/lib/utils'
 import { THEMES } from '@/lib/themes'
 import { INITIAL_FAQS } from '@/lib/faq-data'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -127,6 +128,7 @@ function App() {
   const [localPersons, setLocalPersons] = useKV<Person[]>('ptw-persons', INITIAL_PERSONS)
   const [localDepartments, setLocalDepartments] = useKV<Department[]>('ptw-departments', INITIAL_DEPARTMENTS)
   const [localFaqs, setLocalFaqs] = useKV<FAQItem[]>('ptw-faqs', INITIAL_FAQS)
+  const [forceOffline, setForceOffline] = useKV<boolean>('ptw-force-offline', false)
   const supabaseEnabled = isSupabaseAvailable()
   const [remoteLoading, setRemoteLoading] = useState<boolean>(supabaseEnabled)
   const [remoteError, setRemoteError] = useState<string | null>(null)
@@ -143,6 +145,15 @@ function App() {
   const [currentTheme, setCurrentTheme] = useKV<string>('ptw-theme', 'stellar')
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
   const isMobile = useIsMobile()
+
+  useEffect(() => {
+    console.log('🚀 App initialized:', {
+      supabaseEnabled,
+      localPersonsCount: localPersons?.length || 0,
+      localDepartmentsCount: localDepartments?.length || 0,
+      domain: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
+    })
+  }, [])
 
   const loadSupabaseData = useCallback(async () => {
     if (!supabaseEnabled) return
@@ -201,7 +212,7 @@ function App() {
   }, [remoteError, supabaseEnabled, language])
 
   const remoteReady = supabaseEnabled && remotePersons !== null && remoteDepartments !== null && remoteFaqs !== null
-  const usingSupabaseData = remoteReady && !remoteError
+  const usingSupabaseData = !forceOffline && remoteReady && !remoteError
 
   const allPersons = usingSupabaseData ? remotePersons! : localPersons || INITIAL_PERSONS
   const allDepartments = usingSupabaseData ? remoteDepartments! : localDepartments || INITIAL_DEPARTMENTS
@@ -241,6 +252,7 @@ function App() {
   }
 
   const handleSavePerson = async (personData: Partial<Person>) => {
+    console.log('💾 handleSavePerson called', { personData, editingPerson, usingSupabaseData })
     const successMessage = editingPerson
       ? language === 'ru' ? '✅ Обновлено' : language === 'tr' ? '✅ Güncellendi' : '✅ Updated'
       : language === 'ru' ? '✅ Добавлено' : language === 'tr' ? '✅ Eklendi' : '✅ Added'
@@ -274,7 +286,7 @@ function App() {
       setLocalPersons((current) => (current || []).map((p) => (p.id === editingPerson.id ? { ...p, ...personData } : p)))
     } else {
       const newPerson: Person = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: personData.name!,
         position: personData.position!,
         role: personData.role!,
@@ -284,6 +296,7 @@ function App() {
         customDuties: personData.customDuties,
         customQualifications: personData.customQualifications,
       }
+      console.log('📝 Creating new person:', newPerson)
       setLocalPersons((current) => [...(current || []), newPerson])
     }
 
@@ -450,7 +463,7 @@ function App() {
     }
 
     const newDepartment: Department = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: deptData.name!,
       color: deptData.color!,
       emoji: deptData.emoji!,
@@ -540,7 +553,7 @@ function App() {
     }
 
     const newFAQ: FAQItem = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       question: faqData.question!,
       answer: faqData.answer!,
       category: faqData.category,
@@ -734,6 +747,18 @@ function App() {
                   />
                 </SheetContent>
               </Sheet>
+            )}
+            {supabaseEnabled && (
+              <Button
+                variant={forceOffline ? "destructive" : "secondary"}
+                size="sm"
+                onClick={() => setForceOffline(!forceOffline)}
+                className="font-semibold"
+                title={forceOffline ? "Switch to Online" : "Switch to Offline"}
+              >
+                <Globe className={cn("h-4 w-4 mr-1", forceOffline && "opacity-50")} />
+                {forceOffline ? "Offline" : "Online"}
+              </Button>
             )}
             {isAdminMode ? (
               <Button

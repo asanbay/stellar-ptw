@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
+import * as XLSX from 'xlsx'
 import type { Person, Language } from '@/lib/ptw-types'
+import { generateId } from '@/lib/utils'
 
 interface ImportPersonnelDialogProps {
   open: boolean
@@ -44,12 +46,12 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
       importSuccess: 'Успешно импортировано',
       importError: 'Ошибка импорта',
       howTo: 'Как импортировать сотрудников',
-      step1: '1. Скачайте шаблон Excel',
+      step1: '1. Подготовьте файл Excel или CSV',
       step2: '2. Заполните данные сотрудников',
-      step3: '3. Загрузите файл обратно',
-      step1Desc: 'Нажмите кнопку "Скачать шаблон Excel" чтобы получить образец файла',
-      step2Desc: 'Откройте файл в Excel и заполните: имя, должность, роль (issuer/supervisor/foreman/worker), email, телефон',
-      step3Desc: 'Перетащите файл в область загрузки или нажмите для выбора файла',
+      step3: '3. Загрузите файл',
+      step1Desc: 'Скачайте шаблон Excel или используйте свой файл с колонками: Имя, Должность, Роль, Email, Телефон',
+      step2Desc: 'Заполните данные сотрудников. Обязательно указать: Имя. Роль может быть: issuer, supervisor, foreman, worker',
+      step3Desc: 'Перетащите файл в область загрузки или нажмите для выбора. Поддерживаются форматы Excel (.xlsx, .xls) и CSV',
       viewGuide: 'Подробное руководство',
       errorTitle: 'Обнаружены ошибки',
       roles: {
@@ -81,12 +83,12 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
       importSuccess: 'Başarıyla içe aktarıldı',
       importError: 'İçe aktarma hatası',
       howTo: 'Personel nasıl içe aktarılır',
-      step1: '1. Excel şablonunu indirin',
+      step1: '1. Excel veya CSV dosyasını hazırlayın',
       step2: '2. Personel verilerini doldurun',
-      step3: '3. Dosyayı geri yükleyin',
-      step1Desc: 'Örnek dosyayı almak için "Excel Şablonunu İndir" düğmesine tıklayın',
-      step2Desc: 'Dosyayı Excel\'de açın ve doldurun: ad, pozisyon, rol (issuer/supervisor/foreman/worker), e-posta, telefon',
-      step3Desc: 'Dosyayı yükleme alanına sürükleyin veya dosya seçmek için tıklayın',
+      step3: '3. Dosyayı yükleyin',
+      step1Desc: 'Excel şablonunu indirin veya kendi dosyanızı kullanın. Sütunlar: Ad, Pozisyon, Rol, E-posta, Telefon',
+      step2Desc: 'Personel verilerini doldurun. Zorunlu: Ad. Rol olabilir: issuer, supervisor, foreman, worker',
+      step3Desc: 'Dosyayı yükleme alanına sürükleyin. Excel (.xlsx, .xls) ve CSV formatları desteklenir',
       viewGuide: 'Detaylı kılavuz',
       errorTitle: 'Hatalar tespit edildi',
       roles: {
@@ -118,12 +120,12 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
       importSuccess: 'Successfully imported',
       importError: 'Import error',
       howTo: 'How to import personnel',
-      step1: '1. Download Excel template',
+      step1: '1. Prepare Excel or CSV file',
       step2: '2. Fill in personnel data',
-      step3: '3. Upload file back',
-      step1Desc: 'Click "Download Excel Template" button to get the sample file',
-      step2Desc: 'Open file in Excel and fill in: name, position, role (issuer/supervisor/foreman/worker), email, phone',
-      step3Desc: 'Drag file to upload area or click to select file',
+      step3: '3. Upload file',
+      step1Desc: 'Download Excel template or use your own file with columns: Name, Position, Role, Email, Phone',
+      step2Desc: 'Fill in personnel data. Required: Name. Role can be: issuer, supervisor, foreman, worker',
+      step3Desc: 'Drag file to upload area or click to select. Excel (.xlsx, .xls) and CSV formats are supported',
       viewGuide: 'Detailed guide',
       errorTitle: 'Errors detected',
       roles: {
@@ -262,19 +264,157 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
         return
       }
 
-      // Для Excel файлов показываем предупреждение
+      let persons: Person[] = []
+      
       if (isExcel) {
-        const warning = language === 'ru'
-          ? 'Excel файлы пока не поддерживаются напрямую. Пожалуйста, сохраните файл как CSV в Excel (Файл → Сохранить как → CSV UTF-8)'
-          : language === 'tr'
-          ? 'Excel dosyaları henüz doğrudan desteklenmiyor. Lütfen dosyayı Excel\'de CSV olarak kaydedin (Dosya → Farklı Kaydet → CSV UTF-8)'
-          : 'Excel files are not yet directly supported. Please save the file as CSV in Excel (File → Save As → CSV UTF-8)'
-        toast.warning(warning)
-        setErrors([warning])
-        return
-      }
-
-      const text = await file.text()
+        // Парсим Excel файл
+        try {
+          const arrayBuffer = await file.arrayBuffer()
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+          const sheetName = workbook.SheetNames[0]
+          
+          if (!sheetName) {
+            throw new Error(language === 'ru' ? 'Файл не содержит листов' : language === 'tr' ? 'Dosya sheet içermiyor' : 'File contains no sheets')
+          }
+          
+          const worksheet = workbook.Sheets[sheetName]
+          const data: any[] = XLSX.utils.sheet_to_json(worksheet)
+          
+          if (data.length === 0) {
+            const error = language === 'ru' 
+              ? 'Файл пустой или не содержит данных' 
+              : language === 'tr' 
+              ? 'Dosya boş veya veri içermiyor' 
+              : 'File is empty or contains no data'
+            setErrors([error])
+            toast.error(l.importError)
+            return
+          }
+          
+          const parseErrors: string[] = []
+          
+          // Парсим каждую строку
+          for (let i = 0; i < data.length; i++) {
+            const row = data[i]
+            
+            // Ищем название колонки (может быть разным)
+            const nameField = Object.keys(row).find(k => 
+              k.toLowerCase().includes('name') || 
+              k.toLowerCase().includes('имя') || 
+              k.toLowerCase().includes('ad') ||
+              k.toLowerCase() === 'fio'
+            )
+            const positionField = Object.keys(row).find(k => 
+              k.toLowerCase().includes('position') || 
+              k.toLowerCase().includes('должность') || 
+              k.toLowerCase().includes('pozisyon')
+            )
+            const roleField = Object.keys(row).find(k => 
+              k.toLowerCase().includes('role') || 
+              k.toLowerCase().includes('роль') || 
+              k.toLowerCase().includes('rol')
+            )
+            const emailField = Object.keys(row).find(k => 
+              k.toLowerCase().includes('email') || 
+              k.toLowerCase().includes('e-mail')
+            )
+            const phoneField = Object.keys(row).find(k => 
+              k.toLowerCase().includes('phone') || 
+              k.toLowerCase().includes('телефон') || 
+              k.toLowerCase().includes('telefon')
+            )
+            
+            const name = nameField ? String(row[nameField] || '').trim() : ''
+            const position = positionField ? String(row[positionField] || '').trim() : ''
+            let role: Person['role'] = 'worker'
+            const email = emailField ? String(row[emailField] || '').trim() : undefined
+            const phone = phoneField ? String(row[phoneField] || '').trim() : undefined
+            
+            // Проверяем обязательное поле - имя
+            if (!name) {
+              continue
+            }
+            
+            // Парсим роль
+            if (roleField) {
+              const roleInput = String(row[roleField] || '').toLowerCase().trim()
+              
+              if (['issuer', 'supervisor', 'foreman', 'worker'].includes(roleInput)) {
+                role = roleInput as Person['role']
+              }
+              else if (roleInput.includes('выда') || roleInput.includes('издавател') || roleInput.includes('izin')) {
+                role = 'issuer'
+              }
+              else if (roleInput.includes('руководител') || roleInput.includes('отве') || roleInput.includes('yönetici') || roleInput.includes('super')) {
+                role = 'supervisor'
+              }
+              else if (roleInput.includes('мастер') || roleInput.includes('произв') || roleInput.includes('dopusk') || roleInput.includes('sorumlu')) {
+                role = 'foreman'
+              }
+              else if (roleInput.includes('рабоч') || roleInput.includes('исполн') || roleInput.includes('işçi') || roleInput.includes('work')) {
+                role = 'worker'
+              }
+              else if (roleInput) {
+                parseErrors.push(`${language === 'ru' ? 'Строка' : language === 'tr' ? 'Satır' : 'Line'} ${i + 2}: ${language === 'ru' ? 'роль' : language === 'tr' ? 'rol' : 'role'} "${row[roleField]}" ${language === 'ru' ? 'заменена на "worker"' : language === 'tr' ? '"worker" olarak değiştirildi' : 'changed to "worker"'}`)
+              }
+            }
+            
+            persons.push({
+              id: generateId(),
+              name,
+              position: position || (language === 'ru' ? 'Сотрудник' : language === 'tr' ? 'Çalışan' : 'Employee'),
+              role,
+              email: email || undefined,
+              phone: phone || undefined,
+            })
+          }
+          
+          if (persons.length === 0) {
+            const error = language === 'ru' 
+              ? 'В файле не найдено валидных записей' 
+              : language === 'tr' 
+              ? 'Dosyada geçerli kayıt bulunamadı' 
+              : 'No valid records found in file'
+            setErrors([error])
+            toast.error(l.importError)
+            return
+          }
+          
+          if (parseErrors.length > 0) {
+            setErrors(parseErrors)
+            const warningMsg = language === 'ru'
+              ? `Найдено ${parseErrors.length} предупреждений, но ${persons.length} записей успешно обработано`
+              : language === 'tr'
+              ? `${parseErrors.length} uyarı bulundu, ancak ${persons.length} kayıt başarıyla işlendi`
+              : `Found ${parseErrors.length} warnings, but ${persons.length} records processed successfully`
+            toast.warning(warningMsg)
+          }
+          
+          setPreview(persons)
+          const successMsg = `${l.preview}: ${persons.length} ${l.records}`
+          toast.success(successMsg)
+          
+          console.log('✅ Excel импорт обработан:', {
+            fileName,
+            totalLines: data.length,
+            parsedPersons: persons.length,
+            errors: parseErrors.length,
+            persons: persons.map(p => ({ name: p.name, role: p.role }))
+          })
+        } catch (excelError) {
+          console.error('❌ Excel parse error:', excelError)
+          const errorMsg = language === 'ru' 
+            ? 'Ошибка чтения Excel файла. Проверьте формат файла.'
+            : language === 'tr'
+            ? 'Excel dosyası okuma hatası. Dosya formatını kontrol edin.'
+            : 'Excel file read error. Check the file format.'
+          setErrors([errorMsg])
+          toast.error(l.importError)
+          return
+        }
+      } else {
+        // CSV парсинг (существующий код)
+        const text = await file.text()
       
       // Автоматическое определение разделителя (запятая или точка с запятой)
       const detectDelimiter = (text: string): string => {
@@ -394,7 +534,7 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
         }
 
         persons.push({
-          id: crypto.randomUUID(),
+          id: generateId(),
           name: parts[0].trim(),
           position: parts[1]?.trim() || 'Сотрудник', // Должность по умолчанию
           role: role as Person['role'],
@@ -430,6 +570,7 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
         errors: parseErrors.length,
         persons: persons.map(p => ({ name: p.name, role: p.role }))
       })
+      }
     } catch (error) {
       console.error('❌ Parse error:', error)
       const errorMsg = language === 'ru' ? 'Ошибка чтения файла. Проверьте формат.' :
