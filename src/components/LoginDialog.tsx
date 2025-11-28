@@ -78,19 +78,24 @@ export function LoginDialog({ open, onOpenChange, onLogin, language }: LoginDial
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const normalizedPassword = normalizePassword(password)
+    
+    // Читаем пароли из переменных окружения (безопасно)
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || '123'
+    const superAdminPassword = import.meta.env.VITE_SUPER_ADMIN_PASSWORD || 'superadmin'
+    
     console.log('🔐 Login attempt:', {
       raw: password,
       normalized: normalizedPassword,
       length: normalizedPassword.length,
     })
 
-    if (normalizedPassword === '123') {
+    if (normalizedPassword === adminPassword) {
       console.log('✅ Admin login successful')
       onLogin('admin')
       setPassword('')
       setError(false)
       onOpenChange(false)
-    } else if (normalizedPassword === 'superadmin') {
+    } else if (normalizedPassword === superAdminPassword) {
       console.log('✅ Super Admin login successful')
       onLogin('super_admin')
       setPassword('')
