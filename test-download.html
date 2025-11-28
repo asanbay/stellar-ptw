@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест скачивания CSV</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        #log {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест скачивания CSV шаблона</h1>
+    
+    <div>
+        <button onclick="downloadTemplate()">📥 Скачать шаблон (основной метод)</button>
+        <button onclick="downloadTemplateAlt()">📥 Скачать шаблон (альтернативный)</button>
+        <button onclick="clearLog()">🗑️ Очистить лог</button>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function downloadTemplate() {
+            try {
+                log('🚀 Начало скачивания (основной метод)...', 'info');
+                
+                const templateData = [
+                    ['Имя / Ad / Name', 'Должность / Pozisyon / Position', 'Роль / Rol / Role', 'Email', 'Телефон / Telefon / Phone'],
+                    ['Иванов Иван Иванович', 'Директор по ОТ и ПБ', 'issuer', 'ivanov@example.com', '+79991234567'],
+                    ['Ahmet Yılmaz', 'Операционный директор', 'supervisor', 'ahmet@example.com', '+905551234567'],
+                    ['Петров Петр', 'Мастер-производитель', 'foreman', 'petrov@example.com', '+79991234568'],
+                    ['Сидоров Сергей', 'Рабочий-монтажник', 'worker', 'sidorov@example.com', '+79991234569'],
+                    ['', '', '', '', ''],
+                    ['Роли / Roller / Roles:', '', '', '', ''],
+                    ['issuer', '- Выдающий наряд / İzin Veren / Permit Issuer', '', '', ''],
+                    ['supervisor', '- Ответственный руководитель / Sorumlu Yönetici / Supervisor', '', '', ''],
+                    ['foreman', '- Производитель работ / İş Sorumlusu / Foreman', '', '', ''],
+                    ['worker', '- Рабочий / İşçi / Worker', '', '', ''],
+                ];
+
+                // Определяем разделитель
+                const isWindowsLikeLocale = navigator.language.includes('ru') || 
+                                             navigator.language.includes('tr') ||
+                                             navigator.platform.includes('Win');
+                const delimiter = isWindowsLikeLocale ? ';' : ',';
+                
+                log(`📊 Платформа: ${navigator.platform}`, 'info');
+                log(`🌍 Локаль: ${navigator.language}`, 'info');
+                log(`🔹 Разделитель: "${delimiter}"`, 'info');
+
+                // Создаем CSV с UTF-8 BOM
+                const BOM = '\uFEFF';
+                const csvContent = templateData.map(row => 
+                    row.map(cell => {
+                        if (cell.includes(delimiter) || cell.includes('"') || cell.includes('\n') || cell.includes('\r')) {
+                            return `"${cell.replace(/"/g, '""')}"`;
+                        }
+                        return cell;
+                    }).join(delimiter)
+                ).join('\r\n');
+
+                log(`📄 Размер CSV: ${csvContent.length} символов`, 'info');
+
+                // Создаем Blob
+                const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+                log(`💾 Размер Blob: ${blob.size} байт`, 'info');
+
+                // Создаем ссылку для скачивания
+                const url = window.URL.createObjectURL(blob);
+                log(`🔗 Blob URL создан: ${url.substring(0, 50)}...`, 'info');
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'personnel_template.csv';
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                log('➕ Ссылка добавлена в DOM', 'info');
+                
+                setTimeout(() => {
+                    try {
+                        link.click();
+                        log('✅ Клик выполнен! Файл должен скачаться.', 'success');
+                        
+                        setTimeout(() => {
+                            document.body.removeChild(link);
+                            window.URL.revokeObjectURL(url);
+                            log('🧹 Очистка выполнена', 'info');
+                        }, 100);
+                    } catch (error) {
+                        log(`❌ Ошибка при клике: ${error.message}`, 'error');
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }
+                }, 0);
+                
+            } catch (error) {
+                log(`❌ ОШИБКА: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        function downloadTemplateAlt() {
+            try {
+                log('🚀 Начало скачивания (альтернативный метод)...', 'info');
+                
+                const templateData = [
+                    ['Имя', 'Должность', 'Роль', 'Email', 'Телефон'],
+                    ['Иванов Иван', 'Директор', 'issuer', 'ivanov@example.com', '+79991234567'],
+                    ['Петров Петр', 'Мастер', 'foreman', 'petrov@example.com', '+79991234568'],
+                ];
+
+                const delimiter = ';';
+                const BOM = '\uFEFF';
+                const csvContent = templateData.map(row => row.join(delimiter)).join('\r\n');
+
+                // Альтернативный метод через data URI
+                const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(BOM + csvContent);
+                
+                const link = document.createElement('a');
+                link.href = dataUri;
+                link.download = 'personnel_template_alt.csv';
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                log('✅ Скачивание через data URI выполнено!', 'success');
+                
+            } catch (error) {
+                log(`❌ ОШИБКА: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // Автоматический лог при загрузке
+        window.addEventListener('load', () => {
+            log('🌐 Страница загружена', 'success');
+            log(`🖥️ User Agent: ${navigator.userAgent}`, 'info');
+            log(`📱 Платформа: ${navigator.platform}`, 'info');
+            log(`🌍 Язык: ${navigator.language}`, 'info');
+            log('', 'info');
+            log('👆 Нажмите кнопку для скачивания', 'info');
+        });
+    </script>
+</body>
+</html>

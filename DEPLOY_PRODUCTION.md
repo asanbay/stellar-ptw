@@ -70,6 +70,11 @@ netlify deploy --prod
 3. Введите ваш домен (например: `ptw.stellar.com`)
 4. Следуйте инструкциям для настройки DNS
 
+   **Namecheap / ручная настройка:**
+   - `www` → CNAME на `your-site-id.netlify.app`
+   - `@` (корень) → A-записи `75.2.60.5` и `99.83.229.126`
+   - После сохранения вернитесь в Netlify и нажмите **Verify**
+
 ### 4️⃣ Настройка HTTPS
 
 Netlify автоматически выдаст SSL сертификат от Let's Encrypt.
@@ -274,8 +279,10 @@ https://ваш-домен.com
 Ваше приложение доступно по адресу: `https://ваш-сайт.netlify.app`
 
 **Credentials для входа:**
-- Admin: email и пароль, которые создали в Supabase
-- Users: создаются через Supabase Authentication
+- Admin: `123`
+- Super Admin: `admin123`
+
+*(Пароли настраиваются в `src/components/LoginDialog.tsx`, Supabase сейчас используется как хранилище данных.)*
 
 ---
 

@@ -9,7 +9,7 @@ import type { Language } from '@/lib/ptw-types'
 interface LoginDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onLogin: () => void
+  onLogin: (role?: 'admin' | 'super_admin') => void
   language: Language
 }
 
@@ -19,44 +19,85 @@ export function LoginDialog({ open, onOpenChange, onLogin, language }: LoginDial
 
   const labels = {
     ru: {
-      title: '🔐 Вход для администратора',
-      description: 'Введите пароль для доступа к функциям администратора',
+      title: '🔐 Вход в систему',
+      description: 'Введите пароль для доступа',
       passwordLabel: 'Пароль',
       passwordPlaceholder: 'Введите пароль',
       login: 'Войти',
       cancel: 'Отмена',
       errorMessage: 'Неверный пароль',
+      hint: 'Админ: 123 • Супер-Админ: superadmin',
     },
     tr: {
-      title: '🔐 Yönetici Girişi',
-      description: 'Yönetici işlevlerine erişmek için şifreyi girin',
+      title: '🔐 Sistem Girişi',
+      description: 'Erişim için şifreyi girin',
       passwordLabel: 'Şifre',
       passwordPlaceholder: 'Şifreyi girin',
       login: 'Giriş Yap',
       cancel: 'İptal',
       errorMessage: 'Yanlış şifre',
+      hint: 'Admin: 123 • Süper Admin: superadmin',
     },
     en: {
-      title: '🔐 Administrator Login',
-      description: 'Enter password to access administrator functions',
+      title: '🔐 System Login',
+      description: 'Enter password to access',
       passwordLabel: 'Password',
       passwordPlaceholder: 'Enter password',
       login: 'Login',
       cancel: 'Cancel',
       errorMessage: 'Incorrect password',
+      hint: 'Admin: 123 • Super Admin: superadmin',
     },
   }
 
   const l = labels[language]
 
+  const normalizePassword = (value: string) => {
+    const compact = value.trim().replace(/\s+/g, '')
+    const lower = compact.toLowerCase()
+
+    // Супер-админ пароли (разные раскладки клавиатуры)
+    const superAdminPasswords = [
+      'superadmin',      // EN
+      'суперадмин',      // RU
+      'сгзукфвьшт',      // RU раскладка для superadmin
+      'admin123',        // EN
+      'админ123',        // RU
+      'фвьшт123',        // RU раскладка для admin123
+      'super',           // Короткий вариант
+      'супер',           // RU короткий
+    ]
+
+    if (superAdminPasswords.includes(lower)) {
+      return 'superadmin'
+    }
+
+    return compact
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (password === '123') {
-      onLogin()
+    const normalizedPassword = normalizePassword(password)
+    console.log('🔐 Login attempt:', {
+      raw: password,
+      normalized: normalizedPassword,
+      length: normalizedPassword.length,
+    })
+
+    if (normalizedPassword === '123') {
+      console.log('✅ Admin login successful')
+      onLogin('admin')
+      setPassword('')
+      setError(false)
+      onOpenChange(false)
+    } else if (normalizedPassword === 'superadmin') {
+      console.log('✅ Super Admin login successful')
+      onLogin('super_admin')
       setPassword('')
       setError(false)
       onOpenChange(false)
     } else {
+      console.log('❌ Login failed - invalid password')
       setError(true)
     }
   }
@@ -75,7 +116,12 @@ export function LoginDialog({ open, onOpenChange, onLogin, language }: LoginDial
             <LockKey className="h-5 w-5 text-accent" />
             {l.title}
           </DialogTitle>
-          <DialogDescription>{l.description}</DialogDescription>
+          <DialogDescription>
+            {l.description}
+            <div className="mt-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+              💡 {l.hint}
+            </div>
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

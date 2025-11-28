@@ -11,7 +11,8 @@
 - 🌍 **Select your language**: Russian / Turkish / English
 - 🎨 **Choose a theme**: 6 beautiful color schemes
 - 👀 **View mode**: Read-only access by default
-- 🔒 **Admin mode**: Click "Admin" → Enter password `123`
+- 🔒 **Admin mode**: Click "Admin" → enter password `123`
+- 🚀 **Super Admin**: Click "Admin" → enter password `admin123` to open the Super Admin dashboard
 
 ---
 
@@ -48,6 +49,9 @@
 ## 🔐 Default Credentials
 
 **Admin password:** `123`
+**Super Admin password:** `admin123`
+
+💡 Windows + Excel? Если CSV открывается с иероглифами — следуйте инструкции из `WINDOWS_CSV_FIX.md`.
 
 ---
 

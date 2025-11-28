@@ -138,32 +138,91 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
   const l = labels[language]
 
   const downloadTemplate = () => {
-    const templateData = [
-      ['Имя / Ad / Name', 'Должность / Pozisyon / Position', 'Роль / Rol / Role', 'Email', 'Телефон / Telefon / Phone'],
-      ['Иванов Иван Иванович', 'Директор по ОТ и ПБ', 'issuer', 'ivanov@example.com', '+79991234567'],
-      ['Ahmet Yılmaz', 'Операционный директор', 'supervisor', 'ahmet@example.com', '+905551234567'],
-      ['Петров Петр', 'Мастер-производитель', 'foreman', 'petrov@example.com', '+79991234568'],
-      ['Сидоров Сергей', 'Рабочий-монтажник', 'worker', 'sidorov@example.com', '+79991234569'],
-      ['', '', '', '', ''],
-      ['Роли / Roller / Roles:', '', '', '', ''],
-      ['issuer', '- Выдающий наряд / İzin Veren / Permit Issuer', '', '', ''],
-      ['supervisor', '- Ответственный руководитель / Sorumlu Yönetici / Supervisor', '', '', ''],
-      ['foreman', '- Производитель работ / İş Sorumlusu / Foreman', '', '', ''],
-      ['worker', '- Рабочий / İşçi / Worker', '', '', ''],
-    ]
+    try {
+      const templateData = [
+        ['Имя', 'Должность', 'Роль', 'Email', 'Телефон'],
+        ['Иван Петров', 'Инженер', 'worker', 'ivan@example.com', '+79991234567'],
+        ['Мария Иванова', 'Директор', 'supervisor', 'maria@example.com', '+79001234567'],
+        ['Сергей Сидоров', 'Мастер', 'foreman', 'sergey@example.com', '+79111234567'],
+        ['', '', '', '', ''],
+        ['РОЛИ - можно писать по-русски:', '', '', '', ''],
+        ['worker', 'или Рабочий', '', '', ''],
+        ['supervisor', 'или Руководитель', '', '', ''],
+        ['foreman', 'или Мастер', '', '', ''],
+        ['issuer', 'или Выдающий', '', '', ''],
+      ]    // Определяем разделитель на основе локали системы
+    // Windows часто использует точку с запятой для CSV
+    const isWindowsLikeLocale = navigator.language.includes('ru') || 
+                                 navigator.language.includes('tr') ||
+                                 navigator.platform.includes('Win')
+    const delimiter = isWindowsLikeLocale ? ';' : ','
 
-    let csvContent = 'data:text/csv;charset=utf-8,'
-    csvContent += templateData.map(row => row.join(',')).join('\n')
+    // Создаем CSV с UTF-8 BOM для корректного открытия в Excel на всех платформах
+    const BOM = '\uFEFF'
+    const csvContent = templateData.map(row => 
+      row.map(cell => {
+        // Экранируем ячейки с разделителями, кавычками и переводами строк
+        if (cell.includes(delimiter) || cell.includes('"') || cell.includes('\n') || cell.includes('\r')) {
+          return `"${cell.replace(/"/g, '""')}"`
+        }
+        return cell
+      }).join(delimiter)
+    ).join('\r\n') // Windows-style line endings для максимальной совместимости
 
-    const encodedUri = encodeURI(csvContent)
+    // Создаем Blob с правильной кодировкой
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+    
+    // Создаем ссылку для скачивания
+    const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.setAttribute('href', encodedUri)
-    link.setAttribute('download', 'personnel_template.csv')
+    link.href = url
+    link.download = 'personnel_template.csv'
+    link.style.display = 'none'
+    
+    // Скачиваем файл
     document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    toast.success(l.downloadTemplate)
+    
+    // Используем setTimeout для надежности в разных браузерах
+    setTimeout(() => {
+      try {
+        link.click()
+        
+        // Очищаем после небольшой задержки
+        setTimeout(() => {
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+        }, 100)
+        
+        const successMsg = language === 'ru'
+          ? 'Шаблон скачан! Проверьте папку "Загрузки"'
+          : language === 'tr'
+          ? 'Şablon indirildi! "İndirilenler" klasörünü kontrol edin'
+          : 'Template downloaded! Check your Downloads folder'
+        
+        toast.success(successMsg)
+        
+        console.log('✅ Template downloaded:', {
+          fileName: 'personnel_template.csv',
+          size: blob.size,
+          delimiter,
+          locale: navigator.language
+        })
+      } catch (error) {
+        console.error('❌ Download error:', error)
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        toast.error(language === 'ru' ? 'Ошибка скачивания' : 'Download error')
+      }
+    }, 0)
+    } catch (error) {
+      console.error('❌ Template generation error:', error)
+      const errorMsg = language === 'ru'
+        ? 'Ошибка создания шаблона. Попробуйте еще раз'
+        : language === 'tr'
+        ? 'Şablon oluşturma hatası. Tekrar deneyin'
+        : 'Template generation error. Try again'
+      toast.error(errorMsg)
+    }
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,13 +245,93 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
   const parseFile = async (file: File) => {
     try {
       setErrors([])
+      
+      // Проверяем расширение файла
+      const fileName = file.name.toLowerCase()
+      const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls')
+      const isCsv = fileName.endsWith('.csv')
+      
+      if (!isExcel && !isCsv) {
+        const error = language === 'ru' 
+          ? 'Неподдерживаемый формат файла. Используйте .xlsx, .xls или .csv' 
+          : language === 'tr' 
+          ? 'Desteklenmeyen dosya formatı. .xlsx, .xls veya .csv kullanın'
+          : 'Unsupported file format. Use .xlsx, .xls or .csv'
+        setErrors([error])
+        toast.error(l.importError)
+        return
+      }
+
+      // Для Excel файлов показываем предупреждение
+      if (isExcel) {
+        const warning = language === 'ru'
+          ? 'Excel файлы пока не поддерживаются напрямую. Пожалуйста, сохраните файл как CSV в Excel (Файл → Сохранить как → CSV UTF-8)'
+          : language === 'tr'
+          ? 'Excel dosyaları henüz doğrudan desteklenmiyor. Lütfen dosyayı Excel\'de CSV olarak kaydedin (Dosya → Farklı Kaydet → CSV UTF-8)'
+          : 'Excel files are not yet directly supported. Please save the file as CSV in Excel (File → Save As → CSV UTF-8)'
+        toast.warning(warning)
+        setErrors([warning])
+        return
+      }
+
       const text = await file.text()
-      const lines = text.split('\n').filter(line => line.trim())
+      
+      // Автоматическое определение разделителя (запятая или точка с запятой)
+      const detectDelimiter = (text: string): string => {
+        const firstLine = text.split('\n')[0]
+        const commaCount = (firstLine.match(/,/g) || []).length
+        const semicolonCount = (firstLine.match(/;/g) || []).length
+        return semicolonCount > commaCount ? ';' : ','
+      }
+      
+      const delimiter = detectDelimiter(text)
+      
+      // Улучшенный парсинг CSV с поддержкой экранирования и разных разделителей
+      const parseCSVLine = (line: string, delimiter: string): string[] => {
+        const result: string[] = []
+        let current = ''
+        let inQuotes = false
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i]
+          const nextChar = line[i + 1]
+          
+          if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+              // Двойные кавычки внутри quoted field
+              current += '"'
+              i++ // Пропускаем следующую кавычку
+            } else {
+              // Переключаем режим кавычек
+              inQuotes = !inQuotes
+            }
+          } else if (char === delimiter && !inQuotes) {
+            // Разделитель вне кавычек
+            result.push(current.trim())
+            current = ''
+          } else {
+            current += char
+          }
+        }
+        
+        // Добавляем последнее поле
+        result.push(current.trim())
+        
+        return result
+      }
+
+      const lines = text
+        .replace(/\r\n/g, '\n')  // Нормализуем переводы строк
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .filter(line => line.trim())
       
       if (lines.length < 2) {
-        const error = language === 'ru' ? 'Файл пустой или содержит только заголовок' : 
-                      language === 'tr' ? 'Dosya boş veya sadece başlık içeriyor' : 
-                      'File is empty or contains only header'
+        const error = language === 'ru' 
+          ? 'Файл пустой или содержит только заголовок' 
+          : language === 'tr' 
+          ? 'Dosya boş veya sadece başlık içeriyor' 
+          : 'File is empty or contains only header'
         setErrors([error])
         toast.error(l.importError)
         return
@@ -201,35 +340,66 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
       const persons: Person[] = []
       const parseErrors: string[] = []
       
+      // Пропускаем заголовок (первую строку)
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
-
-        const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g, ''))
         
-        if (parts.length < 3) {
-          parseErrors.push(`Строка ${i + 1}: недостаточно данных`)
-          continue
-        }
-        
-        if (!parts[0] || !parts[1] || !parts[2]) {
-          parseErrors.push(`Строка ${i + 1}: пустые обязательные поля`)
+        // Пропускаем строки с описанием ролей
+        if (line.toLowerCase().includes('роли') || 
+            line.toLowerCase().includes('roller') || 
+            line.toLowerCase().includes('roles')) {
           continue
         }
 
-        const role = parts[2].toLowerCase()
-        if (!['issuer', 'supervisor', 'foreman', 'worker'].includes(role)) {
-          parseErrors.push(`Строка ${i + 1}: неверная роль "${parts[2]}"`)
-          continue
+        const parts = parseCSVLine(line, delimiter)
+        
+        // Проверяем минимальное количество полей (теперь только имя обязательно)
+        if (parts.length < 1) {
+          continue // Просто пропускаем пустые строки
+        }
+        
+        // Проверяем что есть хотя бы имя
+        if (!parts[0] || !parts[0].trim()) {
+          continue // Пропускаем строки без имени
+        }
+
+        // Умная обработка роли с автоматическим исправлением
+        let role = 'worker' // Роль по умолчанию
+        
+        if (parts[2]) {
+          const roleInput = parts[2].toLowerCase().trim()
+          
+          // Прямое совпадение
+          if (['issuer', 'supervisor', 'foreman', 'worker'].includes(roleInput)) {
+            role = roleInput
+          }
+          // Автоматическое исправление русских/турецких названий
+          else if (roleInput.includes('выда') || roleInput.includes('издавател') || roleInput.includes('izin')) {
+            role = 'issuer'
+          }
+          else if (roleInput.includes('руководител') || roleInput.includes('отве') || roleInput.includes('yönetici') || roleInput.includes('super')) {
+            role = 'supervisor'
+          }
+          else if (roleInput.includes('мастер') || roleInput.includes('произв') || roleInput.includes('dopusk') || roleInput.includes('sorumlu')) {
+            role = 'foreman'
+          }
+          else if (roleInput.includes('рабоч') || roleInput.includes('исполн') || roleInput.includes('işçi') || roleInput.includes('work')) {
+            role = 'worker'
+          }
+          else {
+            // Неизвестная роль - используем worker и предупреждаем
+            parseErrors.push(`${language === 'ru' ? 'Строка' : language === 'tr' ? 'Satır' : 'Line'} ${i + 1}: ${language === 'ru' ? 'роль' : language === 'tr' ? 'rol' : 'role'} "${parts[2]}" ${language === 'ru' ? 'заменена на "worker"' : language === 'tr' ? '"worker" olarak değiştirildi' : 'changed to "worker"'}`)
+          }
         }
 
         persons.push({
           id: crypto.randomUUID(),
-          name: parts[0],
-          position: parts[1],
+          name: parts[0].trim(),
+          position: parts[1]?.trim() || 'Сотрудник', // Должность по умолчанию
           role: role as Person['role'],
-          email: parts[3] || undefined,
-          phone: parts[4] || undefined,
+          email: parts[3]?.trim() || undefined,
+          phone: parts[4]?.trim() || undefined,
         })
       }
 
@@ -241,12 +411,27 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
 
       if (parseErrors.length > 0) {
         setErrors(parseErrors)
+        const warningMsg = language === 'ru'
+          ? `Найдено ${parseErrors.length} ошибок, но ${persons.length} записей успешно обработано`
+          : language === 'tr'
+          ? `${parseErrors.length} hata bulundu, ancak ${persons.length} kayıt başarıyla işlendi`
+          : `Found ${parseErrors.length} errors, but ${persons.length} records processed successfully`
+        toast.warning(warningMsg)
       }
 
       setPreview(persons)
-      toast.success(`${l.preview}: ${persons.length} ${l.records}`)
+      const successMsg = `${l.preview}: ${persons.length} ${l.records}`
+      toast.success(successMsg)
+      
+      // Детальное логирование для отладки
+      console.log('✅ Импорт обработан:', {
+        totalLines: lines.length,
+        parsedPersons: persons.length,
+        errors: parseErrors.length,
+        persons: persons.map(p => ({ name: p.name, role: p.role }))
+      })
     } catch (error) {
-      console.error('Parse error:', error)
+      console.error('❌ Parse error:', error)
       const errorMsg = language === 'ru' ? 'Ошибка чтения файла. Проверьте формат.' :
                        language === 'tr' ? 'Dosya okuma hatası. Formatı kontrol edin.' :
                        'File read error. Check format.'
@@ -256,14 +441,19 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
   }
 
   const handleImport = () => {
+    console.log('🚀 Начало импорта:', { previewLength: preview.length, preview })
+    
     if (preview.length === 0) {
+      console.warn('⚠️ Preview пустой, импорт отменен')
       toast.error(l.importError)
       return
     }
 
     setImporting(true)
     try {
+      console.log('📤 Вызов onImport с данными:', preview)
       onImport(preview)
+      console.log('✅ onImport выполнен успешно')
       toast.success(`${l.importSuccess}: ${preview.length} ${l.records}`)
       onOpenChange(false)
       setFile(null)

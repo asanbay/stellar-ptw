@@ -13,7 +13,7 @@ export interface Database {
         Row: {
           id: string
           username: string
-          role: 'user' | 'admin'
+          role: 'user' | 'admin' | 'super_admin'
           full_name: string | null
           created_at: string
           updated_at: string
@@ -21,7 +21,7 @@ export interface Database {
         Insert: {
           id: string
           username: string
-          role?: 'user' | 'admin'
+          role?: 'user' | 'admin' | 'super_admin'
           full_name?: string | null
           created_at?: string
           updated_at?: string
@@ -29,7 +29,7 @@ export interface Database {
         Update: {
           id?: string
           username?: string
-          role?: 'user' | 'admin'
+          role?: 'user' | 'admin' | 'super_admin'
           full_name?: string | null
           updated_at?: string
         }

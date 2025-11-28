@@ -58,6 +58,7 @@ const AnalyticsTab = lazy(() => retryImport(() => import('@/components/Analytics
 const DocumentsTab = lazy(() => retryImport(() => import('@/components/DocumentsTab').then(m => ({ default: m.DocumentsTab }))))
 const PTWTab = lazy(() => retryImport(() => import('@/components/PTWTab').then(m => ({ default: m.PTWTab }))))
 const CombinedWorksTab = lazy(() => retryImport(() => import('@/components/CombinedWorksTab').then(m => ({ default: m.CombinedWorksTab }))))
+const SuperAdminDashboard = lazy(() => retryImport(() => import('@/components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard }))))
 
 const INITIAL_DEPARTMENTS: Department[] = [
   {
@@ -210,9 +211,12 @@ function App() {
     setLoginDialogOpen(true)
   }
 
-  const handleAdminLogin = () => {
-    setUserMode('admin')
-    toast.success(language === 'ru' ? '✅ Вы вошли как администратор' : language === 'tr' ? '✅ Yönetici olarak giriş yaptınız' : '✅ Logged in as administrator')
+  const handleAdminLogin = (role: 'admin' | 'super_admin' = 'admin') => {
+    setUserMode(role)
+    const message = role === 'super_admin'
+      ? (language === 'ru' ? '🚀 Вы вошли как Супер-Администратор' : language === 'tr' ? '🚀 Süper Yönetici olarak giriş yaptınız' : '🚀 Logged in as Super Admin')
+      : (language === 'ru' ? '✅ Вы вошли как администратор' : language === 'tr' ? '✅ Yönetici olarak giriş yaptınız' : '✅ Logged in as administrator')
+    toast.success(message)
   }
 
   const handleSwitchToUser = () => {
@@ -220,7 +224,8 @@ function App() {
     toast.success(language === 'ru' ? '👤 Режим пользователя' : language === 'tr' ? '👤 Kullanıcı modu' : '👤 User mode')
   }
 
-  const isAdminMode = userMode === 'admin'
+  const isAdminMode = userMode === 'admin' || userMode === 'super_admin'
+  const isSuperAdmin = userMode === 'super_admin'
 
   const stats = useMemo(() => calculatePersonStats(allPersons), [allPersons])
   const selectedPerson = allPersons.find((p) => p.id === selectedPersonId)
@@ -374,7 +379,16 @@ function App() {
   }
 
   const handleImportPersons = async (importedPersons: Person[]) => {
-    if (importedPersons.length === 0) return
+    console.log('📥 handleImportPersons вызван:', {
+      count: importedPersons.length,
+      usingSupabase: usingSupabaseData,
+      persons: importedPersons
+    })
+    
+    if (importedPersons.length === 0) {
+      console.warn('⚠️ Нет данных для импорта')
+      return
+    }
 
     const successMessage = language === 'ru'
       ? `✅ Импортировано ${importedPersons.length} сотрудников`
@@ -389,21 +403,28 @@ function App() {
 
     if (usingSupabaseData) {
       try {
+        console.log('💾 Импорт в Supabase...')
         const payload = importedPersons.map((person) => buildPersonnelInsert(person))
+        console.log('📤 Payload для Supabase:', payload)
         const inserted = await personnelStore.bulkCreate(payload)
+        console.log('✅ Supabase вернул:', inserted)
         const mapped = inserted.map(mapPersonnelRow)
+        console.log('✅ Mapped данные:', mapped)
         setRemotePersons((current) => current ? [...current, ...mapped] : mapped)
         toast.success(successMessage)
+        console.log('✅ Импорт в Supabase завершен успешно')
       } catch (error) {
-        console.error('Failed to import personnel', error)
+        console.error('❌ Failed to import personnel', error)
         const details = error instanceof Error ? error.message : 'Unknown error'
         toast.error(`${errorMessage}: ${details}`)
       }
       return
     }
 
+    console.log('💾 Импорт в localStorage...')
     setLocalPersons((current) => [...(current || []), ...importedPersons])
     toast.success(successMessage)
+    console.log('✅ Импорт в localStorage завершен')
   }
 
   const handleAddDepartment = async (deptData: Partial<Department>) => {
@@ -596,12 +617,14 @@ function App() {
         rules: 'Правила',
         faq: 'FAQ',
         analytics: 'Аналитика', 
-        docs: 'Документы' 
+        docs: 'Документы',
+        dashboard: 'Панель'
       }, 
       emptyTitle: 'Выберите сотрудника', 
       emptyDesc: 'Нажмите на сотрудника слева для просмотра деталей',
       emptyDescMobile: 'Нажмите кнопку "Персонал" для выбора сотрудника',
       adminMode: 'Админ',
+      superAdminMode: 'Супер-Админ',
       userMode: 'Пользователь',
       logout: 'Выйти',
       theme: 'Тема',
@@ -620,12 +643,14 @@ function App() {
         rules: 'Kurallar',
         faq: 'SSS',
         analytics: 'Analiz', 
-        docs: 'Belgeler' 
+        docs: 'Belgeler',
+        dashboard: 'Panel'
       }, 
       emptyTitle: 'Çalışan Seçin', 
       emptyDesc: 'Detayları görmek için soldaki bir çalışana tıklayın',
       emptyDescMobile: 'Çalışan seçmek için "Personel" düğmesine tıklayın',
       adminMode: 'Yönetici',
+      superAdminMode: 'Süper Yönetici',
       userMode: 'Kullanıcı',
       logout: 'Çıkış',
       theme: 'Tema',
@@ -644,12 +669,14 @@ function App() {
         rules: 'Rules',
         faq: 'FAQ',
         analytics: 'Analytics', 
-        docs: 'Documents' 
+        docs: 'Documents',
+        dashboard: 'Dashboard'
       }, 
       emptyTitle: 'Select Personnel', 
       emptyDesc: 'Click on a person in the sidebar to view details',
       emptyDescMobile: 'Click "Personnel" button to select a person',
       adminMode: 'Admin',
+      superAdminMode: 'Super Admin',
       userMode: 'User',
       logout: 'Logout',
       theme: 'Theme',
@@ -681,7 +708,7 @@ function App() {
             {isAdminMode && (
               <span className="ml-2 px-2 py-0.5 bg-accent text-accent-foreground rounded text-xs font-semibold flex items-center gap-1">
                 <LockKey className="h-3 w-3" />
-                {l.adminMode}
+                {isSuperAdmin ? l.superAdminMode : l.adminMode}
               </span>
             )}
           </div>
@@ -824,10 +851,22 @@ function App() {
                 <TabsTrigger value="docs" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent">
                   📄 {l.tabs.docs}
                 </TabsTrigger>
+                {isSuperAdmin && (
+                  <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 data-[state=active]:bg-transparent text-indigo-600 font-semibold">
+                    🚀 {l.tabs.dashboard}
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
+              {isSuperAdmin && (
+                <TabsContent value="dashboard" className="mt-0">
+                  <Suspense fallback={<LoadingFallback />}>
+                    <SuperAdminDashboard language={language} />
+                  </Suspense>
+                </TabsContent>
+              )}
               <TabsContent value="personnel" className="mt-0">
                 <div className="space-y-6">
                   {isMobile && (

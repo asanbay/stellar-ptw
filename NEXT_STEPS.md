@@ -40,4 +40,9 @@ https://app.netlify.com/sites/stellar-construction-ptw/configuration/env
 - VITE_SUPABASE_URL
 - VITE_SUPABASE_ANON_KEY
 
+### 4️⃣ Прогнать смоук-тесты
+- `npm run build && npm run preview`
+- Перейти по адресу предпросмотра, проверить вход `123` и `admin123`
+- Пройти ключевые сценарии из `TEST_PLAN.md` (F01–F12)
+
 ## 🚀 После этого сайт заработает!

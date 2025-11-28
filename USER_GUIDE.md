@@ -36,8 +36,9 @@
 #### Для администраторов:
 
 1. Нажмите кнопку **"Админ"** (🔒) в шапке сайта
-2. Введите пароль: **123**
-3. Теперь вы можете:
+2. Введите пароль: **123** (обычный админ) или **admin123** (супер-админ)
+3. При вводе `admin123` появится дополнительная вкладка **Super Admin Dashboard** с расширенными настройками
+4. Теперь вы можете:
    - ✏️ Добавлять и редактировать персонал
    - 📝 Создавать наряды-допуски
    - 📢 Управлять информационным стендом
@@ -77,6 +78,8 @@
 - ✅ Объявления на стенде
 - ✅ Настройки языка и темы
 
+💡 **Windows + Excel**: если CSV-файл открывается с кракозябрами или всё попадает в одну колонку — следуйте инструкции из `WINDOWS_CSV_FIX.md`.
+
 ---
 
 ## English
@@ -103,8 +106,9 @@ The application is available via link and works immediately in your browser. No 
 #### For Administrators:
 
 1. Click the **"Admin"** button (🔒) in the header
-2. Enter password: **123**
-3. Now you can:
+2. Enter password: **123** for standard admin or **admin123** for Super Admin mode
+3. Super Admin mode unlocks the dedicated dashboard tab with advanced controls
+4. Now you can:
    - ✏️ Add and edit personnel
    - 📝 Create work permits
    - 📢 Manage the information board
@@ -144,6 +148,8 @@ All changes are saved **automatically**:
 - ✅ Information board announcements
 - ✅ Language and theme settings
 
+💡 **Windows + Excel**: if CSV files look broken in Excel, check `WINDOWS_CSV_FIX.md` for the step-by-step fix.
+
 ---
 
 ## Türkçe
@@ -170,8 +176,9 @@ Uygulama bağlantı üzerinden erişilebilir ve tarayıcınızda hemen çalış�
 #### Yöneticiler İçin:
 
 1. Başlıktaki **"Yönetici"** düğmesine (🔒) tıklayın
-2. Şifreyi girin: **123**
-3. Artık yapabilirsiniz:
+2. Şifre girin: **123** (yönetici) veya **admin123** (Süper Yönetici)
+3. `admin123` girildiğinde **Super Admin Dashboard** sekmesi açılır
+4. Artık yapabilirsiniz:
    - ✏️ Personel ekle ve düzenle
    - 📝 İş izinleri oluştur
    - 📢 Bilgi panosunu yönet
@@ -210,6 +217,8 @@ Tüm değişiklikler **otomatik olarak** kaydedilir:
 - ✅ İş izinleri
 - ✅ Bilgi panosu duyuruları
 - ✅ Dil ve tema ayarları
+
+💡 **Windows + Excel**: CSV dosyaları yanlış görünüyorsa `WINDOWS_CSV_FIX.md` kılavuzunu izleyin.
 
 ---
 
