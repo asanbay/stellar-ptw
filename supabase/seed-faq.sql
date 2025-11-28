@@ -37,15 +37,11 @@ INSERT INTO faq (id, question, answer, category, order_index) VALUES
 
 -- FAQ 5
 ('faq-5',
- 'Сколько человек может быть в бригаде по наряду-допуску?',
- 'İş izni kapsamında ekipte kaç kişi olabilir?',
--- FAQ 5
-('faq-5',
  '{"ru": "Сколько человек может быть в бригаде по наряду-допуску?", "tr": "İş izni kapsamında ekipte kaç kişi olabilir?", "en": "How many people can be in a work permit team?"}'::jsonb,
  '{"ru": "Количество работников в бригаде определяется исходя из условий выполнения работы и должно быть не менее двух человек. Максимальное количество - 20 человек (свыше 20 требуется согласование с HSE).", "tr": "Ekipteki çalışan sayısı, işin yürütülme koşullarına göre belirlenir ve en az iki kişi olmalıdır. Maksimum sayı - 20 kişi (20''den fazla olması durumunda HSE ile koordinasyon gereklidir).", "en": "The number of workers in a team is determined based on the work execution conditions and must be at least two people. Maximum number - 20 people (more than 20 requires coordination with HSE)."}'::jsonb,
  'Общие',
- 5),кие виды работ требуют оформления наряда-допуска?',
- 'Hangi iş türleri iş izni gerektiri?',
+ 5),
+
 -- FAQ 6
 ('faq-6',
  '{"ru": "Какие виды работ требуют оформления наряда-допуска?", "tr": "Hangi iş türleri iş izni gerektirir?", "en": "What types of work require a work permit?"}'::jsonb,
