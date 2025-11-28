@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from 'react'
 import { useKV } from '@/hooks/use-kv'
-import { UserPlus, Download, Globe, LockKey, User, Palette, Upload, Users } from '@phosphor-icons/react'
+import { UserPlus, Download, Globe, LockKey, User, Palette, Upload, Users, Database } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -709,6 +709,56 @@ function App() {
     </div>
   )
 
+  const handleSeedDatabase = async () => {
+    if (!supabaseEnabled) return
+    
+    const confirmMsg = language === 'ru' 
+      ? 'Вы уверены? Это добавит тестовые данные в базу данных.' 
+      : language === 'tr' 
+      ? 'Emin misiniz? Bu işlem veritabanına test verileri ekleyecektir.' 
+      : 'Are you sure? This will add test data to the database.'
+      
+    if (!window.confirm(confirmMsg)) return
+
+    const loadingMsg = language === 'ru' ? 'Загрузка данных...' : language === 'tr' ? 'Veriler yükleniyor...' : 'Uploading data...'
+    const toastId = toast.loading(loadingMsg)
+    
+    try {
+      // Seed Departments
+      for (const dept of INITIAL_DEPARTMENTS) {
+        // Check if exists to avoid duplicates
+        const existing = remoteDepartments?.find(d => d.name === dept.name)
+        if (!existing) {
+          await departmentStore.create(buildDepartmentInsert(dept))
+        }
+      }
+      
+      // Seed Personnel
+      for (const person of INITIAL_PERSONS) {
+        const existing = remotePersons?.find(p => p.email === person.email)
+        if (!existing) {
+          await personnelStore.create(buildPersonnelInsert(person))
+        }
+      }
+      
+      // Seed FAQs
+      for (const faq of INITIAL_FAQS) {
+        const existing = remoteFaqs?.find(f => f.question === faq.question)
+        if (!existing) {
+          await faqStore.create(buildFAQInsert(faq))
+        }
+      }
+      
+      toast.success(language === 'ru' ? 'База данных заполнена!' : 'Database seeded!', { id: toastId })
+      loadSupabaseData()
+    } catch (e) {
+      console.error(e)
+      toast.error('Failed to seed database', { id: toastId })
+    }
+  }
+
+  const showSeedButton = usingSupabaseData && isAdminMode && (remotePersons?.length === 0 || remoteDepartments?.length === 0)
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Toaster position="top-center" />
@@ -723,6 +773,17 @@ function App() {
                 <LockKey className="h-3 w-3" />
                 {isSuperAdmin ? l.superAdminMode : l.adminMode}
               </span>
+            )}
+            {showSeedButton && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSeedDatabase}
+                className="ml-2 font-semibold bg-yellow-500 hover:bg-yellow-600 text-white border-none animate-pulse"
+              >
+                <Database className="h-4 w-4 mr-1" />
+                {language === 'ru' ? 'Заполнить БД' : 'Seed DB'}
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-2">
