@@ -486,7 +486,7 @@ export function PTWTab({ language, isAdmin, persons }: PTWTabProps) {
                     <div className="flex flex-col text-sm">
                       <span>{format(new Date(form.startDate), 'dd.MM.yyyy')}</span>
                       <span className="text-muted-foreground text-xs">
-                        -> {format(new Date(form.endDate), 'dd.MM.yyyy')}
+                        {'→ '}{format(new Date(form.endDate), 'dd.MM.yyyy')}
                       </span>
                     </div>
                   </TableCell>
