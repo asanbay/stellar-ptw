@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from 'react'
 import { useKV } from '@/hooks/use-kv'
 import { UserPlus, Download, Globe, LockKey, User, Palette, Upload, Users } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
@@ -20,6 +20,21 @@ import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
 import { THEMES } from '@/lib/themes'
 import { INITIAL_FAQS } from '@/lib/faq-data'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { isSupabaseAvailable } from '@/lib/supabase'
+import { personnelStore } from '@/stores/personnel.store'
+import { departmentStore } from '@/stores/departments.store'
+import { faqStore } from '@/stores/faq.store'
+import {
+  buildDepartmentInsert,
+  buildDepartmentUpdate,
+  buildFAQInsert,
+  buildFAQUpdate,
+  buildPersonnelInsert,
+  buildPersonnelUpdate,
+  mapDepartmentRow,
+  mapFAQRow,
+  mapPersonnelRow,
+} from '@/lib/data-mappers'
 
 // Lazy loaded components with error handling
 const retryImport = (importFn: () => Promise<any>, retries = 3, delay = 1000): Promise<any> => {
@@ -108,9 +123,15 @@ const INITIAL_PERSONS: Person[] = [
 ]
 
 function App() {
-  const [persons, setPersons] = useKV<Person[]>('ptw-persons', INITIAL_PERSONS)
-  const [departments, setDepartments] = useKV<Department[]>('ptw-departments', INITIAL_DEPARTMENTS)
-  const [faqs, setFaqs] = useKV<FAQItem[]>('ptw-faqs', INITIAL_FAQS)
+  const [localPersons, setLocalPersons] = useKV<Person[]>('ptw-persons', INITIAL_PERSONS)
+  const [localDepartments, setLocalDepartments] = useKV<Department[]>('ptw-departments', INITIAL_DEPARTMENTS)
+  const [localFaqs, setLocalFaqs] = useKV<FAQItem[]>('ptw-faqs', INITIAL_FAQS)
+  const supabaseEnabled = isSupabaseAvailable()
+  const [remoteLoading, setRemoteLoading] = useState<boolean>(supabaseEnabled)
+  const [remoteError, setRemoteError] = useState<string | null>(null)
+  const [remotePersons, setRemotePersons] = useState<Person[] | null>(null)
+  const [remoteDepartments, setRemoteDepartments] = useState<Department[] | null>(null)
+  const [remoteFaqs, setRemoteFaqs] = useState<FAQItem[] | null>(null)
   const { language, setLanguage } = useLanguage()
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -121,6 +142,33 @@ function App() {
   const [currentTheme, setCurrentTheme] = useKV<string>('ptw-theme', 'stellar')
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
   const isMobile = useIsMobile()
+
+  const loadSupabaseData = useCallback(async () => {
+    if (!supabaseEnabled) return
+
+    setRemoteLoading(true)
+    setRemoteError(null)
+
+    try {
+      const [departmentsData, personsData, faqData] = await Promise.all([
+        departmentStore.getAll(),
+        personnelStore.getAll(),
+        faqStore.getAll(),
+      ])
+
+      setRemoteDepartments(departmentsData.map(mapDepartmentRow))
+      setRemotePersons(personsData.map(mapPersonnelRow))
+      setRemoteFaqs(faqData.map(mapFAQRow))
+    } catch (error) {
+      console.error('Failed to load Supabase data', error)
+      setRemoteDepartments(null)
+      setRemotePersons(null)
+      setRemoteFaqs(null)
+      setRemoteError(error instanceof Error ? error.message : 'Unknown Supabase error')
+    } finally {
+      setRemoteLoading(false)
+    }
+  }, [supabaseEnabled])
 
   useEffect(() => {
     const themeKey = currentTheme || 'stellar'
@@ -133,6 +181,30 @@ function App() {
       })
     }
   }, [currentTheme])
+
+  useEffect(() => {
+    if (supabaseEnabled) {
+      loadSupabaseData()
+    }
+  }, [supabaseEnabled, loadSupabaseData])
+
+  useEffect(() => {
+    if (remoteError && supabaseEnabled) {
+      const message = language === 'ru'
+        ? 'Не удалось загрузить данные из Supabase. Используется локальное хранилище.'
+        : language === 'tr'
+          ? 'Supabase verileri yüklenemedi. Yerel depolama kullanılıyor.'
+          : 'Failed to load Supabase data. Falling back to local storage.'
+      toast.error(message)
+    }
+  }, [remoteError, supabaseEnabled, language])
+
+  const remoteReady = supabaseEnabled && remotePersons !== null && remoteDepartments !== null && remoteFaqs !== null
+  const usingSupabaseData = remoteReady && !remoteError
+
+  const allPersons = usingSupabaseData ? remotePersons! : localPersons || INITIAL_PERSONS
+  const allDepartments = usingSupabaseData ? remoteDepartments! : localDepartments || INITIAL_DEPARTMENTS
+  const allFaqs = usingSupabaseData ? remoteFaqs! : localFaqs || INITIAL_FAQS
 
   const handleSwitchToAdmin = () => {
     setLoginDialogOpen(true)
@@ -150,7 +222,6 @@ function App() {
 
   const isAdminMode = userMode === 'admin'
 
-  const allPersons = persons || INITIAL_PERSONS
   const stats = useMemo(() => calculatePersonStats(allPersons), [allPersons])
   const selectedPerson = allPersons.find((p) => p.id === selectedPersonId)
 
@@ -164,10 +235,38 @@ function App() {
     setDialogOpen(true)
   }
 
-  const handleSavePerson = (personData: Partial<Person>) => {
+  const handleSavePerson = async (personData: Partial<Person>) => {
+    const successMessage = editingPerson
+      ? language === 'ru' ? '✅ Обновлено' : language === 'tr' ? '✅ Güncellendi' : '✅ Updated'
+      : language === 'ru' ? '✅ Добавлено' : language === 'tr' ? '✅ Eklendi' : '✅ Added'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось сохранить сотрудника'
+      : language === 'tr'
+        ? '❌ Personel kaydedilemedi'
+        : '❌ Failed to save personnel'
+
+    if (usingSupabaseData) {
+      try {
+        if (editingPerson) {
+          const updated = await personnelStore.update(editingPerson.id, buildPersonnelUpdate(personData))
+          const mapped = mapPersonnelRow(updated)
+          setRemotePersons((current) => current ? current.map((p) => (p.id === editingPerson.id ? mapped : p)) : [mapped])
+        } else {
+          const created = await personnelStore.create(buildPersonnelInsert(personData))
+          const mapped = mapPersonnelRow(created)
+          setRemotePersons((current) => current ? [...current, mapped] : [mapped])
+        }
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to save personnel', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
     if (editingPerson) {
-      setPersons((current) => (current || []).map((p) => (p.id === editingPerson.id ? { ...p, ...personData } : p)))
-      toast.success(language === 'ru' ? '✅ Обновлено' : language === 'tr' ? '✅ Güncellendi' : '✅ Updated')
+      setLocalPersons((current) => (current || []).map((p) => (p.id === editingPerson.id ? { ...p, ...personData } : p)))
     } else {
       const newPerson: Person = {
         id: crypto.randomUUID(),
@@ -176,17 +275,45 @@ function App() {
         role: personData.role!,
         email: personData.email,
         phone: personData.phone,
+        departmentId: personData.departmentId,
+        customDuties: personData.customDuties,
+        customQualifications: personData.customQualifications,
       }
-      setPersons((current) => [...(current || []), newPerson])
-      toast.success(language === 'ru' ? '✅ Добавлено' : language === 'tr' ? '✅ Eklendi' : '✅ Added')
+      setLocalPersons((current) => [...(current || []), newPerson])
     }
+
+    toast.success(successMessage)
   }
 
-  const handleDeletePerson = (id: string) => {
-    setPersons((current) => (current || []).filter((p) => p.id !== id))
+  const handleDeletePerson = async (id: string) => {
+    const successMessage = language === 'ru' ? '✅ Удалено' : language === 'tr' ? '✅ Silindi' : '✅ Deleted'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось удалить сотрудника'
+      : language === 'tr'
+        ? '❌ Personel silinemedi'
+        : '❌ Failed to delete personnel'
+
+    if (usingSupabaseData) {
+      try {
+        await personnelStore.delete(id)
+        setRemotePersons((current) => current ? current.filter((p) => p.id !== id) : current)
+        if (selectedPersonId === id) {
+          setSelectedPersonId(null)
+        }
+        setMobileSheetOpen(false)
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to delete personnel', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalPersons((current) => (current || []).filter((p) => p.id !== id))
     setSelectedPersonId(null)
     setMobileSheetOpen(false)
-    toast.success(language === 'ru' ? '✅ Удалено' : language === 'tr' ? '✅ Silindi' : '✅ Deleted')
+    toast.success(successMessage)
   }
 
   const handleExport = () => {
@@ -194,22 +321,113 @@ function App() {
     toast.success(language === 'ru' ? '✅ Экспортировано' : language === 'tr' ? '✅ Dışa Aktarıldı' : '✅ Exported')
   }
 
-  const handleUpdateDuties = (personId: string, duties: string[]) => {
-    setPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customDuties: duties } : p)))
-    toast.success(language === 'ru' ? '✅ Обязанности обновлены' : language === 'tr' ? '✅ Yükümlülükler güncellendi' : '✅ Duties updated')
+  const handleUpdateDuties = async (personId: string, duties: string[]) => {
+    const successMessage = language === 'ru' ? '✅ Обязанности обновлены' : language === 'tr' ? '✅ Yükümlülükler güncellendi' : '✅ Duties updated'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось обновить обязанности'
+      : language === 'tr'
+        ? '❌ Yükümlülükler güncellenemedi'
+        : '❌ Failed to update duties'
+
+    if (usingSupabaseData) {
+      try {
+        const updated = await personnelStore.update(personId, buildPersonnelUpdate({ customDuties: duties }))
+        const mapped = mapPersonnelRow(updated)
+        setRemotePersons((current) => current ? current.map((p) => (p.id === personId ? mapped : p)) : [mapped])
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to update duties', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customDuties: duties } : p)))
+    toast.success(successMessage)
   }
 
-  const handleUpdateQualifications = (personId: string, qualifications: string[]) => {
-    setPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customQualifications: qualifications } : p)))
-    toast.success(language === 'ru' ? '✅ Квалификация обновлена' : language === 'tr' ? '✅ Nitelikler güncellendi' : '✅ Qualifications updated')
+  const handleUpdateQualifications = async (personId: string, qualifications: string[]) => {
+    const successMessage = language === 'ru' ? '✅ Квалификация обновлена' : language === 'tr' ? '✅ Nitelikler güncellendi' : '✅ Qualifications updated'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось обновить квалификацию'
+      : language === 'tr'
+        ? '❌ Nitelikler güncellenemedi'
+        : '❌ Failed to update qualifications'
+
+    if (usingSupabaseData) {
+      try {
+        const updated = await personnelStore.update(personId, buildPersonnelUpdate({ customQualifications: qualifications }))
+        const mapped = mapPersonnelRow(updated)
+        setRemotePersons((current) => current ? current.map((p) => (p.id === personId ? mapped : p)) : [mapped])
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to update qualifications', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customQualifications: qualifications } : p)))
+    toast.success(successMessage)
   }
 
-  const handleImportPersons = (importedPersons: Person[]) => {
-    setPersons((current) => [...(current || []), ...importedPersons])
-    toast.success(language === 'ru' ? `✅ Импортировано ${importedPersons.length} сотрудников` : language === 'tr' ? `✅ ${importedPersons.length} çalışan içe aktarıldı` : `✅ Imported ${importedPersons.length} personnel`)
+  const handleImportPersons = async (importedPersons: Person[]) => {
+    if (importedPersons.length === 0) return
+
+    const successMessage = language === 'ru'
+      ? `✅ Импортировано ${importedPersons.length} сотрудников`
+      : language === 'tr'
+        ? `✅ ${importedPersons.length} çalışan içe aktarıldı`
+        : `✅ Imported ${importedPersons.length} personnel`
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось импортировать сотрудников'
+      : language === 'tr'
+        ? '❌ Personel içe aktarılamadı'
+        : '❌ Failed to import personnel'
+
+    if (usingSupabaseData) {
+      try {
+        const payload = importedPersons.map((person) => buildPersonnelInsert(person))
+        const inserted = await personnelStore.bulkCreate(payload)
+        const mapped = inserted.map(mapPersonnelRow)
+        setRemotePersons((current) => current ? [...current, ...mapped] : mapped)
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to import personnel', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalPersons((current) => [...(current || []), ...importedPersons])
+    toast.success(successMessage)
   }
 
-  const handleAddDepartment = (deptData: Partial<Department>) => {
+  const handleAddDepartment = async (deptData: Partial<Department>) => {
+    const successMessage = language === 'ru' ? '✅ Отдел добавлен' : language === 'tr' ? '✅ Departman eklendi' : '✅ Department added'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось добавить отдел'
+      : language === 'tr'
+        ? '❌ Departman eklenemedi'
+        : '❌ Failed to add department'
+
+    if (usingSupabaseData) {
+      try {
+        const created = await departmentStore.create(buildDepartmentInsert(deptData))
+        const mapped = mapDepartmentRow(created)
+        setRemoteDepartments((current) => current ? [...current, mapped] : [mapped])
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to add department', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
     const newDepartment: Department = {
       id: crypto.randomUUID(),
       name: deptData.name!,
@@ -217,41 +435,152 @@ function App() {
       emoji: deptData.emoji!,
       description: deptData.description,
     }
-    setDepartments((current) => [...(current || []), newDepartment])
-    toast.success(language === 'ru' ? '✅ Отдел добавлен' : language === 'tr' ? '✅ Departman eklendi' : '✅ Department added')
+    setLocalDepartments((current) => [...(current || []), newDepartment])
+    toast.success(successMessage)
   }
 
-  const handleEditDepartment = (id: string, deptData: Partial<Department>) => {
-    setDepartments((current) => (current || []).map((d) => (d.id === id ? { ...d, ...deptData } : d)))
-    toast.success(language === 'ru' ? '✅ Отдел обновлен' : language === 'tr' ? '✅ Departman güncellendi' : '✅ Department updated')
+  const handleEditDepartment = async (id: string, deptData: Partial<Department>) => {
+    const successMessage = language === 'ru' ? '✅ Отдел обновлен' : language === 'tr' ? '✅ Departman güncellendi' : '✅ Department updated'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось обновить отдел'
+      : language === 'tr'
+        ? '❌ Departman güncellenemedi'
+        : '❌ Failed to update department'
+
+    if (usingSupabaseData) {
+      try {
+        const updated = await departmentStore.update(id, buildDepartmentUpdate(deptData))
+        const mapped = mapDepartmentRow(updated)
+        setRemoteDepartments((current) => current ? current.map((d) => (d.id === id ? mapped : d)) : [mapped])
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to update department', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalDepartments((current) => (current || []).map((d) => (d.id === id ? { ...d, ...deptData } : d)))
+    toast.success(successMessage)
   }
 
-  const handleDeleteDepartment = (id: string) => {
-    setDepartments((current) => (current || []).filter((d) => d.id !== id))
-    setPersons((current) => (current || []).map((p) => (p.departmentId === id ? { ...p, departmentId: undefined } : p)))
-    toast.success(language === 'ru' ? '✅ Отдел удален' : language === 'tr' ? '✅ Departman silindi' : '✅ Department deleted')
+  const handleDeleteDepartment = async (id: string) => {
+    const successMessage = language === 'ru' ? '✅ Отдел удален' : language === 'tr' ? '✅ Departman silindi' : '✅ Department deleted'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось удалить отдел'
+      : language === 'tr'
+        ? '❌ Departman silinemedi'
+        : '❌ Failed to delete department'
+
+    if (usingSupabaseData) {
+      try {
+        await departmentStore.delete(id)
+        setRemoteDepartments((current) => current ? current.filter((d) => d.id !== id) : current)
+        setRemotePersons((current) => current ? current.map((p) => (p.departmentId === id ? { ...p, departmentId: undefined } : p)) : current)
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to delete department', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalDepartments((current) => (current || []).filter((d) => d.id !== id))
+    setLocalPersons((current) => (current || []).map((p) => (p.departmentId === id ? { ...p, departmentId: undefined } : p)))
+    toast.success(successMessage)
   }
 
-  const handleAddFAQ = (faqData: Partial<FAQItem>) => {
+  const handleAddFAQ = async (faqData: Partial<FAQItem>) => {
+    const successMessage = language === 'ru' ? '✅ Вопрос добавлен' : language === 'tr' ? '✅ Soru eklendi' : '✅ Question added'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось добавить вопрос'
+      : language === 'tr'
+        ? '❌ Soru eklenemedi'
+        : '❌ Failed to add question'
+    const order = faqData.order ?? allFaqs.length
+
+    if (usingSupabaseData) {
+      try {
+        const created = await faqStore.create(buildFAQInsert({ ...faqData, order }))
+        const mapped = mapFAQRow(created)
+        setRemoteFaqs((current) => {
+          const next = current ? [...current, mapped] : [mapped]
+          return next.sort((a, b) => a.order - b.order)
+        })
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to add FAQ', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
     const newFAQ: FAQItem = {
       id: crypto.randomUUID(),
       question: faqData.question!,
       answer: faqData.answer!,
       category: faqData.category,
-      order: faqData.order ?? (faqs || []).length,
+      order,
     }
-    setFaqs((current) => [...(current || []), newFAQ])
-    toast.success(language === 'ru' ? '✅ Вопрос добавлен' : language === 'tr' ? '✅ Soru eklendi' : '✅ Question added')
+    setLocalFaqs((current) => [...(current || []), newFAQ])
+    toast.success(successMessage)
   }
 
-  const handleEditFAQ = (id: string, faqData: Partial<FAQItem>) => {
-    setFaqs((current) => (current || []).map((f) => (f.id === id ? { ...f, ...faqData } : f)))
-    toast.success(language === 'ru' ? '✅ Вопрос обновлен' : language === 'tr' ? '✅ Soru güncellendi' : '✅ Question updated')
+  const handleEditFAQ = async (id: string, faqData: Partial<FAQItem>) => {
+    const successMessage = language === 'ru' ? '✅ Вопрос обновлен' : language === 'tr' ? '✅ Soru güncellendi' : '✅ Question updated'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось обновить вопрос'
+      : language === 'tr'
+        ? '❌ Soru güncellenemedi'
+        : '❌ Failed to update question'
+
+    if (usingSupabaseData) {
+      try {
+        const updated = await faqStore.update(id, buildFAQUpdate(faqData))
+        const mapped = mapFAQRow(updated)
+        setRemoteFaqs((current) => {
+          const next = current ? current.map((f) => (f.id === id ? mapped : f)) : [mapped]
+          return next.sort((a, b) => a.order - b.order)
+        })
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to update FAQ', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalFaqs((current) => (current || []).map((f) => (f.id === id ? { ...f, ...faqData } : f)))
+    toast.success(successMessage)
   }
 
-  const handleDeleteFAQ = (id: string) => {
-    setFaqs((current) => (current || []).filter((f) => f.id !== id))
-    toast.success(language === 'ru' ? '✅ Вопрос удален' : language === 'tr' ? '✅ Soru silindi' : '✅ Question deleted')
+  const handleDeleteFAQ = async (id: string) => {
+    const successMessage = language === 'ru' ? '✅ Вопрос удален' : language === 'tr' ? '✅ Soru silindi' : '✅ Question deleted'
+    const errorMessage = language === 'ru'
+      ? '❌ Не удалось удалить вопрос'
+      : language === 'tr'
+        ? '❌ Soru silinemedi'
+        : '❌ Failed to delete question'
+
+    if (usingSupabaseData) {
+      try {
+        await faqStore.delete(id)
+        setRemoteFaqs((current) => current ? current.filter((f) => f.id !== id) : current)
+        toast.success(successMessage)
+      } catch (error) {
+        console.error('Failed to delete FAQ', error)
+        const details = error instanceof Error ? error.message : 'Unknown error'
+        toast.error(`${errorMessage}: ${details}`)
+      }
+      return
+    }
+
+    setLocalFaqs((current) => (current || []).filter((f) => f.id !== id))
+    toast.success(successMessage)
   }
 
   const labels = {
@@ -368,7 +697,7 @@ function App() {
                 <SheetContent side="left" className="w-80 p-0">
                   <PersonnelSidebar 
                     persons={allPersons} 
-                    departments={departments || []} 
+                    departments={allDepartments} 
                     selectedId={selectedPersonId} 
                     onSelectPerson={(id) => {
                       setSelectedPersonId(id)
@@ -444,9 +773,21 @@ function App() {
         </div>
       </header>
 
+      {supabaseEnabled && remoteLoading && !usingSupabaseData && (
+        <div className="w-full px-4 py-2">
+          <div className="mx-auto max-w-[1800px] rounded-md border border-border/40 bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
+            {language === 'ru'
+              ? 'Загружаем данные из Supabase...'
+              : language === 'tr'
+                ? 'Supabase verileri yükleniyor...'
+                : 'Loading data from Supabase...'}
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden max-w-[1800px] mx-auto w-full">
         <aside className="w-80 flex-shrink-0 hidden md:flex">
-          <PersonnelSidebar persons={allPersons} departments={departments || []} selectedId={selectedPersonId} onSelectPerson={setSelectedPersonId} language={language} />
+          <PersonnelSidebar persons={allPersons} departments={allDepartments} selectedId={selectedPersonId} onSelectPerson={setSelectedPersonId} language={language} />
         </aside>
 
         <main className="flex-1 flex flex-col overflow-hidden">
@@ -489,6 +830,18 @@ function App() {
             <div className="flex-1 overflow-y-auto p-6">
               <TabsContent value="personnel" className="mt-0">
                 <div className="space-y-6">
+                  {isMobile && (
+                    <div className="md:hidden">
+                      <PersonnelSidebar
+                        persons={allPersons}
+                        departments={allDepartments}
+                        selectedId={selectedPersonId}
+                        onSelectPerson={setSelectedPersonId}
+                        language={language}
+                        variant="card"
+                      />
+                    </div>
+                  )}
                   <div className="w-full">
                     <InfoBoard language={language} isAdmin={isAdminMode} />
                   </div>
@@ -498,7 +851,7 @@ function App() {
                         person={selectedPerson} 
                         language={language} 
                         isAdmin={isAdminMode}
-                        departments={departments || []}
+                        departments={allDepartments}
                         onEdit={handleEditPerson} 
                         onDelete={handleDeletePerson}
                         onUpdateDuties={handleUpdateDuties}
@@ -531,7 +884,7 @@ function App() {
 
               <TabsContent value="departments" className="mt-0">
                 <DepartmentsTab
-                  departments={departments || []}
+                  departments={allDepartments}
                   persons={allPersons}
                   language={language}
                   isAdmin={isAdminMode}
@@ -563,7 +916,7 @@ function App() {
                 <FAQTab
                   language={language}
                   isAdmin={isAdminMode}
-                  faqs={faqs || []}
+                  faqs={allFaqs}
                   onAddFAQ={handleAddFAQ}
                   onEditFAQ={handleEditFAQ}
                   onDeleteFAQ={handleDeleteFAQ}
@@ -589,7 +942,7 @@ function App() {
       <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} onLogin={handleAdminLogin} language={language} />
       {isAdminMode && (
         <>
-          <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} departments={departments || []} />
+          <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} departments={allDepartments} />
           <ImportPersonnelDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} onImport={handleImportPersons} language={language} />
         </>
       )}

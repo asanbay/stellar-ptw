@@ -17,7 +17,9 @@ export const permitStore = {
         *,
         responsible:personnel!responsible_person_id(*),
         issuer:personnel!issuer_id(*),
-        supervisor:personnel!supervisor_id(*)
+        supervisor:personnel!supervisor_id(*),
+        foreman:personnel!foreman_id(*),
+        permit_workers(worker_id)
       `)
       .order('created_at', { ascending: false });
 
@@ -36,7 +38,9 @@ export const permitStore = {
         *,
         responsible:personnel!responsible_person_id(*),
         issuer:personnel!issuer_id(*),
-        supervisor:personnel!supervisor_id(*)
+        supervisor:personnel!supervisor_id(*),
+        foreman:personnel!foreman_id(*),
+        permit_workers(worker_id)
       `)
       .eq('id', id)
       .single();
@@ -45,7 +49,7 @@ export const permitStore = {
     return data;
   },
 
-  async create(permit: NewPermit) {
+  async create(permit: NewPermit, workerIds: string[] = []) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase not available');
     }
@@ -57,10 +61,26 @@ export const permitStore = {
       .single();
 
     if (error) throw error;
+
+    if (workerIds.length > 0) {
+      const workers = workerIds.map(id => ({
+        permit_id: data.id,
+        worker_id: id
+      }));
+      
+      const { error: workersError } = await supabase!
+        .from('permit_workers')
+        .insert(workers);
+        
+      if (workersError) {
+        console.error('Error adding workers:', workersError);
+      }
+    }
+
     return data;
   },
 
-  async update(id: string, permit: UpdatePermit) {
+  async update(id: string, permit: UpdatePermit, workerIds?: string[]) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase not available');
     }
@@ -73,6 +93,27 @@ export const permitStore = {
       .single();
 
     if (error) throw error;
+
+    if (workerIds !== undefined) {
+      // Delete existing
+      await supabase!
+        .from('permit_workers')
+        .delete()
+        .eq('permit_id', id);
+        
+      // Insert new
+      if (workerIds.length > 0) {
+        const workers = workerIds.map(wid => ({
+          permit_id: id,
+          worker_id: wid
+        }));
+        
+        await supabase!
+          .from('permit_workers')
+          .insert(workers);
+      }
+    }
+
     return data;
   },
 
@@ -100,7 +141,8 @@ export const permitStore = {
         *,
         responsible:personnel!responsible_person_id(*),
         issuer:personnel!issuer_id(*),
-        supervisor:personnel!supervisor_id(*)
+        supervisor:personnel!supervisor_id(*),
+        permit_workers(worker_id)
       `)
       .eq('status', status)
       .order('created_at', { ascending: false });

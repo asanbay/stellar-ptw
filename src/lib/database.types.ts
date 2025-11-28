@@ -102,6 +102,23 @@ export interface Database {
           updated_at?: string
         }
       }
+      permit_workers: {
+        Row: {
+          permit_id: string
+          worker_id: string
+          created_at: string
+        }
+        Insert: {
+          permit_id: string
+          worker_id: string
+          created_at?: string
+        }
+        Update: {
+          permit_id?: string
+          worker_id?: string
+          created_at?: string
+        }
+      }
       permits: {
         Row: {
           id: string
@@ -109,16 +126,34 @@ export interface Database {
           type: string
           description: string | null
           location: string | null
-          status: 'draft' | 'active' | 'completed' | 'cancelled'
+          status:
+            | 'draft'
+            | 'issued'
+            | 'in-progress'
+            | 'suspended'
+            | 'completed'
+            | 'closed'
+            | 'cancelled'
           start_date: string | null
           end_date: string | null
           responsible_person_id: string | null
           issuer_id: string | null
           supervisor_id: string | null
-          worker_ids: Json
           safety_measures: Json
           equipment: Json
           hazards: Json
+          work_scope: string | null
+          valid_until: string | null
+          foreman_id: string | null
+          daily_admissions: Json
+          notes: string | null
+          attachments: Json
+          is_combined_work: boolean
+          combined_work_journal_ref: string | null
+          issued_at: string | null
+          started_at: string | null
+          completed_at: string | null
+          closed_at: string | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -129,16 +164,34 @@ export interface Database {
           type: string
           description?: string | null
           location?: string | null
-          status?: 'draft' | 'active' | 'completed' | 'cancelled'
+          status?:
+            | 'draft'
+            | 'issued'
+            | 'in-progress'
+            | 'suspended'
+            | 'completed'
+            | 'closed'
+            | 'cancelled'
           start_date?: string | null
           end_date?: string | null
           responsible_person_id?: string | null
           issuer_id?: string | null
           supervisor_id?: string | null
-          worker_ids?: Json
           safety_measures?: Json
           equipment?: Json
           hazards?: Json
+          work_scope?: string | null
+          valid_until?: string | null
+          foreman_id?: string | null
+          daily_admissions?: Json
+          notes?: string | null
+          attachments?: Json
+          is_combined_work?: boolean
+          combined_work_journal_ref?: string | null
+          issued_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+          closed_at?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -149,16 +202,34 @@ export interface Database {
           type?: string
           description?: string | null
           location?: string | null
-          status?: 'draft' | 'active' | 'completed' | 'cancelled'
+          status?:
+            | 'draft'
+            | 'issued'
+            | 'in-progress'
+            | 'suspended'
+            | 'completed'
+            | 'closed'
+            | 'cancelled'
           start_date?: string | null
           end_date?: string | null
           responsible_person_id?: string | null
           issuer_id?: string | null
           supervisor_id?: string | null
-          worker_ids?: Json
           safety_measures?: Json
           equipment?: Json
           hazards?: Json
+          work_scope?: string | null
+          valid_until?: string | null
+          foreman_id?: string | null
+          daily_admissions?: Json
+          notes?: string | null
+          attachments?: Json
+          is_combined_work?: boolean
+          combined_work_journal_ref?: string | null
+          issued_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+          closed_at?: string | null
           updated_at?: string
         }
       }
@@ -235,6 +306,11 @@ export interface Database {
           date: string
           person_id: string | null
           work_description: string
+          location: string | null
+          ptw_numbers: Json
+          organizations: Json
+          work_types: Json
+          safety_measures: Json
           hours: number
           created_by: string | null
           created_at: string
@@ -245,6 +321,11 @@ export interface Database {
           date: string
           person_id?: string | null
           work_description: string
+          location?: string | null
+          ptw_numbers?: Json
+          organizations?: Json
+          work_types?: Json
+          safety_measures?: Json
           hours: number
           created_by?: string | null
           created_at?: string
@@ -255,6 +336,11 @@ export interface Database {
           date?: string
           person_id?: string | null
           work_description?: string
+          location?: string | null
+          ptw_numbers?: Json
+          organizations?: Json
+          work_types?: Json
+          safety_measures?: Json
           hours?: number
           updated_at?: string
         }

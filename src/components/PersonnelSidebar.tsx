@@ -15,11 +15,12 @@ interface PersonnelSidebarProps {
   selectedId: string | null
   onSelectPerson: (id: string) => void
   language: Language
+  variant?: 'sidebar' | 'card'
 }
 
 type FilterRole = Role | 'all'
 
-export function PersonnelSidebar({ persons, departments, selectedId, onSelectPerson, language }: PersonnelSidebarProps) {
+export function PersonnelSidebar({ persons, departments, selectedId, onSelectPerson, language, variant = 'sidebar' }: PersonnelSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<FilterRole>('all')
   const [groupByDepartment, setGroupByDepartment] = useState(true)
@@ -61,9 +62,14 @@ export function PersonnelSidebar({ persons, departments, selectedId, onSelectPer
     return groups
   }, [filteredPersons, departments, groupByDepartment])
 
+  const rootClasses = cn(
+    'flex flex-col bg-card',
+    variant === 'sidebar' ? 'h-full border-r' : 'border rounded-xl shadow-sm overflow-hidden'
+  )
+
   return (
-    <div className="flex flex-col h-full border-r bg-card">
-      <div className="p-3 md:p-4 border-b">
+    <div className={rootClasses}>
+      <div className={cn('border-b', variant === 'sidebar' ? 'p-3 md:p-4' : 'p-4')}>
         <h2 className="font-semibold text-base mb-3">👥 {language === 'ru' ? 'Персонал' : language === 'tr' ? 'Personel' : 'Personnel'}</h2>
         <div className="relative">
           <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -76,7 +82,7 @@ export function PersonnelSidebar({ persons, departments, selectedId, onSelectPer
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/50">
+      <div className={cn('flex flex-wrap gap-1 border-b bg-muted/50', variant === 'sidebar' ? 'p-2' : 'p-3')}>
         {(['all', 'issuer', 'supervisor', 'foreman', 'worker'] as FilterRole[]).map((roleFilter) => (
           <Button
             key={roleFilter}
@@ -90,14 +96,14 @@ export function PersonnelSidebar({ persons, departments, selectedId, onSelectPer
         ))}
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-2 space-y-3">
+      <ScrollArea className={cn('flex-1', variant === 'card' && 'max-h-[60vh]')}>
+        <div className={cn('space-y-3', variant === 'sidebar' ? 'p-2' : 'p-3')}>
           {departments.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setGroupByDepartment(!groupByDepartment)}
-              className="w-full text-xs"
+              className={cn('w-full text-xs', variant === 'card' && 'justify-start')}
             >
               {groupByDepartment ? '📂' : '📄'}{' '}
               {groupByDepartment
