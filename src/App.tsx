@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from 'react'
 import { useKV } from '@/hooks/use-kv'
-import { UserPlus, Download, Globe, LockKey, User, Palette, Upload, Users, Database } from '@phosphor-icons/react'
+import { UserPlus, Download, Globe, LockKey, User, Palette, Upload, Users, Database, CloudArrowUp } from '@phosphor-icons/react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -698,6 +698,88 @@ function App() {
     },
   }
 
+  const handleSyncToCloud = async () => {
+    if (!isSupabaseAvailable()) {
+      toast.error(language === 'ru' ? 'Нет соединения с облаком' : 'No cloud connection')
+      return
+    }
+
+    const confirmMsg = language === 'ru'
+      ? 'Отправить локальные данные в облако? Существующие записи не будут изменены.'
+      : language === 'tr'
+      ? 'Yerel veriler buluta gönderilsin mi? Mevcut kayıtlar değiştirilmeyecektir.'
+      : 'Push local data to cloud? Existing records will not be changed.'
+
+    if (!window.confirm(confirmMsg)) return
+
+    const loadingMsg = language === 'ru' ? 'Синхронизация...' : language === 'tr' ? 'Senkronizasyon...' : 'Syncing...'
+    const toastId = toast.loading(loadingMsg)
+
+    let addedCount = 0
+    let skippedCount = 0
+
+    try {
+      // 1. Sync Departments
+      const currentRemoteDepts = await departmentStore.getAll()
+      for (const localDept of (localDepartments || [])) {
+        // Check by Name or ID
+        const exists = currentRemoteDepts.some(d => d.name === localDept.name || d.id === localDept.id)
+        if (!exists) {
+          await departmentStore.create(buildDepartmentInsert(localDept))
+          addedCount++
+        } else {
+          skippedCount++
+        }
+      }
+
+      // 2. Sync Personnel
+      const currentRemotePersons = await personnelStore.getAll()
+      for (const localPerson of (localPersons || [])) {
+        // Check by Email (if exists) or Name + Role, or ID
+        const exists = currentRemotePersons.some(p =>
+          p.id === localPerson.id ||
+          (localPerson.email && p.email === localPerson.email) ||
+          (p.name === localPerson.name && p.role === localPerson.role)
+        )
+
+        if (!exists) {
+          await personnelStore.create(buildPersonnelInsert(localPerson))
+          addedCount++
+        } else {
+          skippedCount++
+        }
+      }
+
+      // 3. Sync FAQs
+      const currentRemoteFaqs = await faqStore.getAll()
+      for (const localFaq of (localFaqs || [])) {
+        const exists = currentRemoteFaqs.some(f => f.id === localFaq.id || f.question === localFaq.question)
+        if (!exists) {
+          await faqStore.create(buildFAQInsert(localFaq))
+          addedCount++
+        } else {
+          skippedCount++
+        }
+      }
+
+      toast.success(
+        language === 'ru'
+          ? `Готово! Добавлено: ${addedCount}, Пропущено: ${skippedCount}`
+          : `Done! Added: ${addedCount}, Skipped: ${skippedCount}`,
+        { id: toastId }
+      )
+
+      // Refresh remote data if we are currently viewing it (or if we switch to it)
+      if (!forceOffline) {
+        loadSupabaseData()
+      }
+
+    } catch (error) {
+      console.error('Sync error:', error)
+      toast.error(language === 'ru' ? 'Ошибка синхронизации' : 'Sync error', { id: toastId })
+    }
+  }
+
   const l = labels[language]
 
   const LoadingFallback = () => (
@@ -810,16 +892,31 @@ function App() {
               </Sheet>
             )}
             {supabaseEnabled && (
-              <Button
-                variant={forceOffline ? "destructive" : "secondary"}
-                size="sm"
-                onClick={() => setForceOffline(!forceOffline)}
-                className="font-semibold"
-                title={forceOffline ? "Switch to Online" : "Switch to Offline"}
-              >
-                <Globe className={cn("h-4 w-4 mr-1", forceOffline && "opacity-50")} />
-                {forceOffline ? "Offline" : "Online"}
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant={forceOffline ? "destructive" : "secondary"}
+                  size="sm"
+                  onClick={() => setForceOffline(!forceOffline)}
+                  className="font-semibold"
+                  title={forceOffline ? "Switch to Online" : "Switch to Offline"}
+                >
+                  <Globe className={cn("h-4 w-4 mr-1", forceOffline && "opacity-50")} />
+                  {forceOffline ? "Offline" : "Online"}
+                </Button>
+                
+                {forceOffline && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSyncToCloud}
+                    className="font-semibold bg-blue-600 hover:bg-blue-700 text-white border-none"
+                    title={language === 'ru' ? "Отправить в облако" : "Push to Cloud"}
+                  >
+                    <CloudArrowUp className="h-4 w-4 mr-1" />
+                    {language === 'ru' ? "Синхр." : "Sync"}
+                  </Button>
+                )}
+              </div>
             )}
             {isAdminMode ? (
               <Button
