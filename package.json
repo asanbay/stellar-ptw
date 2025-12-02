@@ -15,7 +15,6 @@
         "@github/spark": "^0.39.0",
         "@heroicons/react": "^2.2.0",
         "@hookform/resolvers": "^4.1.3",
-        "@octokit/core": "^6.1.4",
         "@phosphor-icons/react": "^2.1.7",
         "@radix-ui/colors": "^3.0.0",
         "@radix-ui/react-accordion": "^1.2.3",
@@ -54,12 +53,15 @@
         "d3": "^7.9.0",
         "date-fns": "^3.6.0",
         "embla-carousel-react": "^8.5.2",
+        "exceljs": "^4.4.0",
         "framer-motion": "^12.6.2",
         "input-otp": "^1.4.2",
+        "jspdf": "^3.0.4",
         "lucide-react": "^0.484.0",
         "marked": "^15.0.7",
         "next-themes": "^0.4.6",
-        "octokit": "^4.1.2",
+        "octokit": "^5.0.3",
+        "qrcode.react": "^4.2.0",
         "react": "^19.0.0",
         "react-day-picker": "^9.6.7",
         "react-dom": "^19.0.0",
@@ -73,7 +75,6 @@
         "tw-animate-css": "^1.2.4",
         "uuid": "^11.1.0",
         "vaul": "^1.1.2",
-        "xlsx": "^0.18.5",
         "zod": "^3.25.76"
     },
     "devDependencies": {
@@ -89,11 +90,18 @@
         "tailwindcss": "^4.1.11",
         "typescript": "~5.7.2",
         "typescript-eslint": "^8.38.0",
-        "vite": "^6.4.1"
+        "vite": "6.4.1"
     },
     "workspaces": {
         "packages": [
             "packages/*"
         ]
+    },
+    "overrides": {
+        "octokit": "^5.0.3",
+        "@octokit/core": "^7.0.6",
+        "@types/react": "^19.0.10",
+        "@types/react-dom": "^19.0.4",
+        "vite": "6.4.1"
     }
 }
