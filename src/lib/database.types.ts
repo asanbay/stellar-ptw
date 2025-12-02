@@ -345,6 +345,75 @@ export interface Database {
           updated_at?: string
         }
       }
+      audit_logs: {
+        Row: {
+          id: string
+          user_id: string
+          user_name: string
+          action: 'create' | 'update' | 'delete' | 'export' | 'import' | 'login' | 'logout'
+          entity_type: 'personnel' | 'department' | 'ptw' | 'combined-work' | 'faq' | 'announcement'
+          entity_id: string
+          entity_name: string | null
+          changes: Json
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          user_name: string
+          action: 'create' | 'update' | 'delete' | 'export' | 'import' | 'login' | 'logout'
+          entity_type: 'personnel' | 'department' | 'ptw' | 'combined-work' | 'faq' | 'announcement'
+          entity_id: string
+          entity_name?: string | null
+          changes?: Json
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          user_name?: string
+          action?: 'create' | 'update' | 'delete' | 'export' | 'import' | 'login' | 'logout'
+          entity_type?: 'personnel' | 'department' | 'ptw' | 'combined-work' | 'faq' | 'announcement'
+          entity_id?: string
+          entity_name?: string | null
+          changes?: Json
+          metadata?: Json
+          created_at?: string
+        }
+      }
+      edit_locks: {
+        Row: {
+          id: string
+          resource_type: string
+          resource_id: string
+          owner_id: string
+          owner_name: string | null
+          created_at: string
+          updated_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          resource_type: string
+          resource_id: string
+          owner_id: string
+          owner_name?: string | null
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          resource_type?: string
+          resource_id?: string
+          owner_id?: string
+          owner_name?: string | null
+          expires_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }

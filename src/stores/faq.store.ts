@@ -25,13 +25,20 @@ export const faqStore = {
       throw new Error('Supabase not available');
     }
 
+    console.log('📤 faqStore.create payload:', payload);
+
     const { data, error } = await supabase!
       .from('faq')
-      .insert([payload])
+      .insert<FAQInsert>([payload])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ faqStore.create error:', error);
+      throw error;
+    }
+    
+    console.log('✅ faqStore.create success:', data);
     return data as FAQRow;
   },
 
@@ -42,7 +49,7 @@ export const faqStore = {
 
     const { data, error } = await supabase!
       .from('faq')
-      .update(payload)
+      .update<FAQUpdate>(payload)
       .eq('id', id)
       .select()
       .single();

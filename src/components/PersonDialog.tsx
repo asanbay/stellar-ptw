@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from '@phosphor-icons/react'
+import { WarningCircle } from '@phosphor-icons/react'
 import type { Person, Role, Language, Department } from '@/lib/ptw-types'
+import { logger } from '@/lib/logger'
 import { ROLE_LABELS, PROCEDURE_DUTIES } from '@/lib/ptw-constants'
 
 interface PersonDialogProps {
@@ -48,7 +49,7 @@ export function PersonDialog({ open, onOpenChange, onSave, person, language, dep
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('📋 PersonDialog handleSubmit called', { formData, isFormValid })
+    logger.log('📋 PersonDialog handleSubmit called', { formData, isFormValid })
     
     // Проверяем обязательные поля
     if (!formData.name?.trim()) {
@@ -141,7 +142,7 @@ export function PersonDialog({ open, onOpenChange, onSave, person, language, dep
         <form onSubmit={handleSubmit} className="space-y-4">
           {validationError && (
             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+              <WarningCircle className="h-4 w-4" />
               <AlertDescription>{validationError}</AlertDescription>
             </Alert>
           )}

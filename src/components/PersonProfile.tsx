@@ -24,8 +24,8 @@ export function PersonProfile({ person, language, isAdmin, departments, onEdit, 
   const defaultQualifications = AUTO_QUALIFICATIONS[person.role][language]
   const orderTypes = AUTO_ORDER_TYPES[person.role]
 
-  const duties = person.customDuties || defaultDuties
-  const qualifications = person.customQualifications || defaultQualifications
+  const duties = (person.customDuties && person.customDuties.length > 0) ? person.customDuties : defaultDuties
+  const qualifications = (person.customQualifications && person.customQualifications.length > 0) ? person.customQualifications : defaultQualifications
   const department = departments.find((d) => d.id === person.departmentId)
 
   const [editingDuties, setEditingDuties] = useState(false)
@@ -231,7 +231,7 @@ export function PersonProfile({ person, language, isAdmin, departments, onEdit, 
           </h3>
           {isAdmin && !editingDuties && (
             <div className="flex gap-2">
-              {person.customDuties && (
+              {(person.customDuties && person.customDuties.length > 0) && (
                 <Button size="sm" variant="outline" onClick={handleResetDuties} className="h-8 text-xs">
                   {l.reset}
                 </Button>
@@ -304,7 +304,7 @@ export function PersonProfile({ person, language, isAdmin, departments, onEdit, 
           </h3>
           {isAdmin && !editingQualifications && (
             <div className="flex gap-2">
-              {person.customQualifications && (
+              {(person.customQualifications && person.customQualifications.length > 0) && (
                 <Button size="sm" variant="outline" onClick={handleResetQualifications} className="h-8 text-xs">
                   {l.reset}
                 </Button>

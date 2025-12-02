@@ -119,6 +119,7 @@ export const buildPersonnelInsert = (person: Partial<Person>): PersonnelInsert =
   }
 
   return {
+    ...(person.id ? { id: person.id } : {}),
     name: person.name,
     position: person.position,
     role: person.role,
@@ -151,6 +152,7 @@ export const buildDepartmentInsert = (department: Partial<Department>): Departme
   }
 
   return {
+    ...(department.id ? { id: department.id } : {}),
     name: department.name,
     color: department.color,
     emoji: department.emoji,
@@ -175,6 +177,7 @@ export const buildFAQInsert = (faq: Partial<FAQItem>): FAQInsert => {
   }
 
   return {
+    ...(faq.id ? { id: faq.id } : {}),
     question: toJson(faq.question),
     answer: toJson(faq.answer),
     category: faq.category ?? null,

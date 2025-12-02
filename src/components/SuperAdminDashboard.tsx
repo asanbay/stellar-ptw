@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Table,
   TableBody,
@@ -22,11 +23,11 @@ import {
   ChartBar,
   UserGear,
   Download,
-  Activity,
+  ChartLineUp,
   ChartPie,
   Clock,
   CloudCheck,
-  ArrowsClockwise
+  Info
 } from '@phosphor-icons/react'
 import { userStore } from '@/stores/users.store'
 import { permitStore } from '@/stores/permits.store'
@@ -34,14 +35,20 @@ import { personnelStore } from '@/stores/personnel.store'
 import { departmentStore } from '@/stores/departments.store'
 import { faqStore } from '@/stores/faq.store'
 import { toast } from 'sonner'
+import { isSupabaseAvailable } from '@/lib/supabase'
 import type { Language } from '@/lib/ptw-types'
 import { format } from 'date-fns'
+import { logger } from '@/lib/logger'
 
 interface SuperAdminDashboardProps {
   language: Language
+  localPersonnel?: any[]
+  localPermits?: any[]
+  localDepartments?: any[]
 }
 
-export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
+export function SuperAdminDashboard({ language, localPersonnel = [], localPermits = [], localDepartments = [] }: SuperAdminDashboardProps) {
+  const supabaseEnabled = isSupabaseAvailable()
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalAdmins: 0,
@@ -53,23 +60,12 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
   })
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [hasData, setHasData] = useState(false)
 
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [permitStats, setPermitStats] = useState<Record<string, number>>({})
   const [departmentStats, setDepartmentStats] = useState<Record<string, number>>({})
   const [storageSize, setStorageSize] = useState<number>(0)
-  const [isOnline, setIsOnline] = useState(navigator.onLine)
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
 
   const labels = {
     ru: {
@@ -108,9 +104,6 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
       createUser: 'Создать пользователя',
       viewLogs: 'Просмотр логов',
       storageUsage: 'Использование хранилища',
-      syncStatus: 'Синхронизация',
-      online: 'Онлайн',
-      offline: 'Оффлайн',
       lastBackup: 'Последний бэкап',
       notAvailable: 'Нет данных'
     },
@@ -150,9 +143,6 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
       createUser: 'Kullanıcı Oluştur',
       viewLogs: 'Günlükleri Görüntüle',
       storageUsage: 'Depolama Kullanımı',
-      syncStatus: 'Senkronizasyon',
-      online: 'Çevrimiçi',
-      offline: 'Çevrimdışı',
       lastBackup: 'Son Yedekleme',
       notAvailable: 'Veri Yok'
     },
@@ -192,9 +182,6 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
       createUser: 'Create User',
       viewLogs: 'View Logs',
       storageUsage: 'Storage Usage',
-      syncStatus: 'Synchronization',
-      online: 'Online',
-      offline: 'Offline',
       lastBackup: 'Last Backup',
       notAvailable: 'Not Available'
     }
@@ -212,20 +199,124 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
   useEffect(() => {
     loadData()
   }, [])
+  
+  // Перезагружаем данные при изменении локальных данных
+  useEffect(() => {
+    if (!supabaseEnabled && (localPersonnel.length > 0 || localPermits.length > 0 || localDepartments.length > 0)) {
+      logger.log('🔄 Обновляем панель с новыми локальными данными')
+      loadData()
+    }
+  }, [localPersonnel.length, localPermits.length, localDepartments.length, supabaseEnabled])
 
   const loadData = async () => {
     setLoading(true)
+    logger.log('🚀 SuperAdminDashboard: начинаем загрузку данных', { supabaseEnabled })
+    
     try {
-      // Fetch all data in parallel
+      if (!supabaseEnabled) {
+        // Используем локальные данные из localStorage
+        logger.warn('⚠️ Supabase не настроен, используем данные из localStorage')
+        
+        const totalData = JSON.stringify({ localPersonnel, localPermits, localDepartments })
+        const sizeBytes = new Blob([totalData]).size
+        const sizeMB = sizeBytes / (1024 * 1024)
+        
+        setStats({
+          totalUsers: 0, // Users только из Supabase
+          totalAdmins: 0,
+          totalSuperAdmins: 0,
+          totalPermits: localPermits.length,
+          activePermits: localPermits.filter((p: any) => p.status === 'active' || p.status === 'issued' || p.status === 'in-progress').length,
+          totalPersonnel: localPersonnel.length,
+          storageUsed: `${sizeMB.toFixed(2)} MB`
+        })
+        
+        // Статистика по нарядам
+        const pStats: Record<string, number> = {}
+        localPermits.forEach((p: any) => {
+          pStats[p.status] = (pStats[p.status] || 0) + 1
+        })
+        setPermitStats(pStats)
+        
+        // Статистика по отделам
+        const dStats: Record<string, number> = {}
+        localPersonnel.forEach((p: any) => {
+          if (p.departmentId) {
+            const dept = localDepartments.find((d: any) => d.id === p.departmentId)
+            const name = dept ? dept.name : 'Unknown'
+            dStats[name] = (dStats[name] || 0) + 1
+          } else {
+            dStats['Без отдела'] = (dStats['Без отдела'] || 0) + 1
+          }
+        })
+        setDepartmentStats(dStats)
+        
+        // Недавняя активность из локальных данных
+        const activity = [
+          ...localPermits.slice(0, 3).map((p: any) => ({
+            type: 'permit',
+            title: `${l.newPermit}: ${p.number}`,
+            desc: p.workDescription,
+            date: p.createdAt,
+            icon: FileText,
+            color: 'text-blue-500 bg-blue-50'
+          })),
+          ...localPersonnel.slice(0, 3).map((p: any) => ({
+            type: 'personnel',
+            title: `Персонал: ${p.name}`,
+            desc: p.position,
+            date: new Date().toISOString(),
+            icon: Users,
+            color: 'text-green-500 bg-green-50'
+          }))
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6)
+        
+        setRecentActivity(activity)
+        setStorageSize(sizeMB)
+        setHasData(localPersonnel.length > 0 || localPermits.length > 0)
+        
+        logger.log('✅ Загружены локальные данные:', {
+          personnel: localPersonnel.length,
+          permits: localPermits.length,
+          departments: localDepartments.length
+        })
+        
+        setLoading(false)
+        return
+      }
+
+      // Fetch all data in parallel with individual error handling
       const [userStats, userList, permitsData, personnel, departments] = await Promise.all([
-        userStore.getSystemStats(),
-        userStore.getAll(),
-        permitStore.getAll(),
-        personnelStore.getAll(),
-        departmentStore.getAll()
+        userStore.getSystemStats().catch(err => {
+          logger.warn('⚠️ Failed to load user stats:', err)
+          return { users: 0, admins: 0, super_admins: 0, storage_used_mb: 0 }
+        }),
+        userStore.getAll().catch(err => {
+          logger.warn('⚠️ Failed to load users:', err)
+          return []
+        }),
+        permitStore.getAll().catch(err => {
+          logger.warn('⚠️ Failed to load permits:', err)
+          return []
+        }),
+        personnelStore.getAll().catch(err => {
+          logger.warn('⚠️ Failed to load personnel:', err)
+          return []
+        }),
+        departmentStore.getAll().catch(err => {
+          logger.warn('⚠️ Failed to load departments:', err)
+          return []
+        })
       ])
 
       const permits = (permitsData || []) as any[]
+      
+      logger.log('📊 Загружено данных:', { 
+        users: userList.length, 
+        permits: permits.length,
+        personnel: personnel.length,
+        departments: departments.length
+      })
 
       // Calculate real data size (approximate)
       const totalData = JSON.stringify({ userList, permits, personnel, departments })
@@ -286,10 +377,41 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6)
       
       setRecentActivity(activity)
+      
+      // Check if we have any real data
+      const hasRealData = userList.length > 0 || permits.length > 0 || personnel.length > 0
+      setHasData(hasRealData)
+      
+      if (hasRealData) {
+        logger.log('✅ SuperAdminDashboard: данные загружены', { 
+          users: userList.length, 
+          permits: permits.length,
+          personnel: personnel.length 
+        })
+      } else {
+        logger.warn('⚠️ SuperAdminDashboard: база данных пустая')
+      }
 
     } catch (error) {
-      console.error('Failed to load super admin data', error)
-      toast.error('Failed to load system data')
+      logger.error('❌ Failed to load super admin data:', error)
+      const errorMsg = language === 'ru' 
+        ? 'Не удалось загрузить данные системы' 
+        : language === 'tr'
+        ? 'Sistem verileri yüklenemedi'
+        : 'Failed to load system data'
+      toast.error(errorMsg)
+      
+      // Set default values on error
+      setStats({
+        totalUsers: 0,
+        totalAdmins: 0,
+        totalSuperAdmins: 0,
+        totalPermits: 0,
+        activePermits: 0,
+        totalPersonnel: 0,
+        storageUsed: '0 MB'
+      })
+      setHasData(false)
     } finally {
       setLoading(false)
     }
@@ -335,27 +457,73 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
 
   const handleRoleChange = async (userId: string, newRole: 'user' | 'admin' | 'super_admin') => {
     try {
+      logger.log('👤 Изменение роли пользователя:', { userId, newRole })
       await userStore.updateUserRole(userId, newRole)
-      toast.success(`Role updated to ${newRole}`)
+      toast.success(`${language === 'ru' ? 'Роль изменена на' : 'Role updated to'} ${newRole}`)
       loadData() // Reload to reflect changes
     } catch (error) {
-      toast.error('Failed to update role')
+      logger.error('❌ Failed to update role:', error)
+      toast.error(language === 'ru' ? 'Не удалось обновить роль' : 'Failed to update role')
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+          <p className="mt-4 text-muted-foreground">
+            {language === 'ru' ? 'Загрузка...' : language === 'tr' ? 'Yükleniyor...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6 p-6 bg-slate-50/50 min-h-screen">
-      <div className="flex items-center justify-between">
-        <div>
+      {!supabaseEnabled && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>
+            {language === 'ru' ? 'Режим локального хранилища' : language === 'tr' ? 'Yerel depolama modu' : 'Local Storage Mode'}
+          </AlertTitle>
+          <AlertDescription>
+            {language === 'ru' 
+              ? 'Показываются данные из localStorage. Для управления пользователями и полного функционала подключите Supabase (VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY).'
+              : language === 'tr'
+              ? 'localStorage veriler gösteriliyor. Kullanıcı yönetimi ve tam işlevsellik için Supabase bağlayın.'
+              : 'Showing localStorage data. Connect Supabase for user management and full functionality.'}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {supabaseEnabled && !hasData && !loading && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>
+            {language === 'ru' ? 'База данных пустая' : language === 'tr' ? 'Veritabanı boş' : 'Database Empty'}
+          </AlertTitle>
+          <AlertDescription>
+            {language === 'ru' 
+              ? 'Нет данных для отображения. Создайте пользователей через Supabase Auth или заполните базу данных тестовыми данными.'
+              : language === 'tr'
+              ? 'Görüntülenecek veri yok. Supabase Auth aracılığıyla kullanıcı oluşturun veya veritabanını test verileriyle doldurun.'
+              : 'No data to display. Create users via Supabase Auth or seed the database with test data.'}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="flex items-center justify-between">\n        <div>
           <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
             <ShieldCheck className="h-8 w-8 text-indigo-600" />
             {l.title}
           </h1>
           <p className="text-slate-500 mt-1">{l.subtitle}</p>
         </div>
-        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-3 py-1">
+        <Badge variant="outline" className={supabaseEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}>
           <Database className="h-4 w-4 mr-1" />
-          {l.connected}
+          {supabaseEnabled ? l.connected : l.disconnected}
         </Badge>
       </div>
 
@@ -416,7 +584,7 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
+              <ChartLineUp className="h-5 w-5" />
               {l.recentActivity}
             </CardTitle>
           </CardHeader>
@@ -517,16 +685,6 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
               </div>
               
               <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center gap-2">
-                  <ArrowsClockwise className={`h-4 w-4 ${isOnline ? 'text-green-500 animate-spin-slow' : 'text-red-500'}`} />
-                  <span className="text-sm font-medium">{l.syncStatus}</span>
-                </div>
-                <Badge variant={isOnline ? 'default' : 'destructive'}>
-                  {isOnline ? l.online : l.offline}
-                </Badge>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t">
                 <span className="text-sm text-muted-foreground">{l.lastBackup}</span>
                 <span className="text-sm font-medium">{l.notAvailable}</span>
               </div>
@@ -553,7 +711,7 @@ export function SuperAdminDashboard({ language }: SuperAdminDashboardProps) {
                 {l.createUser}
               </Button>
               <Button className="w-full justify-start" variant="outline">
-                <Activity className="mr-2 h-4 w-4" />
+                <ChartLineUp className="mr-2 h-4 w-4" />
                 {l.viewLogs}
               </Button>
             </div>

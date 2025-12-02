@@ -42,7 +42,7 @@ export const departmentStore = {
     
     const { data, error } = await supabase!
       .from('departments')
-      .insert([department])
+      .insert<NewDepartment>([department])
       .select()
       .single();
 
@@ -57,7 +57,7 @@ export const departmentStore = {
     
     const { data, error } = await supabase!
       .from('departments')
-      .update(department)
+      .update<UpdateDepartment>(department)
       .eq('id', id)
       .select()
       .single();

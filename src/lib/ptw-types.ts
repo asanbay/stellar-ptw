@@ -2,6 +2,8 @@ export type Language = 'ru' | 'tr' | 'en'
 
 export type Role = 'issuer' | 'supervisor' | 'foreman' | 'worker'
 
+export type UserMode = 'user' | 'admin' | 'super_admin'
+
 export interface Department {
   id: string
   name: string

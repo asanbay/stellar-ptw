@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Pencil, Trash, Users } from '@phosphor-icons/react'
 import type { Department, Language, Person } from '@/lib/ptw-types'
 import { DepartmentDialog } from '@/components/DepartmentDialog'
+import { editLocks, getDefaultOwnerId, startHeartbeat } from '@/lib/edit-locks'
+import { toast } from 'sonner'
 
 interface DepartmentsTabProps {
   departments: Department[]
@@ -26,15 +28,30 @@ export function DepartmentsTab({
 }: DepartmentsTabProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingDepartment, setEditingDepartment] = useState<Department | undefined>()
+  const heartbeatRef = useRef<{ stop: () => void } | null>(null)
+  const ownerIdRef = useRef<string>(getDefaultOwnerId())
 
   const handleAdd = () => {
     setEditingDepartment(undefined)
     setDialogOpen(true)
   }
 
-  const handleEdit = (dept: Department) => {
+  const handleEdit = async (dept: Department) => {
+    const { ok } = await editLocks.acquire('department', dept.id, ownerIdRef.current)
+    if (!ok) {
+      toast.warning(
+        language === 'ru'
+          ? 'Этот отдел уже редактируется'
+          : language === 'tr'
+            ? 'Bu departman düzenleniyor'
+            : 'This department is being edited'
+      )
+      return
+    }
     setEditingDepartment(dept)
     setDialogOpen(true)
+    heartbeatRef.current?.stop?.()
+    heartbeatRef.current = startHeartbeat('department', dept.id, ownerIdRef.current)
   }
 
   const handleSave = (deptData: Partial<Department>) => {
@@ -158,7 +175,15 @@ export function DepartmentsTab({
       {isAdmin && (
         <DepartmentDialog
           open={dialogOpen}
-          onOpenChange={setDialogOpen}
+          onOpenChange={async (open) => {
+            setDialogOpen(open)
+            if (!open && editingDepartment) {
+              heartbeatRef.current?.stop?.()
+              heartbeatRef.current = null
+              await editLocks.release('department', editingDepartment.id, ownerIdRef.current)
+              setEditingDepartment(undefined)
+            }
+          }}
           onSave={handleSave}
           department={editingDepartment}
           language={language}

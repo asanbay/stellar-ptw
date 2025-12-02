@@ -6,6 +6,20 @@ type NewPermit = Database['public']['Tables']['permits']['Insert'];
 type UpdatePermit = Database['public']['Tables']['permits']['Update'];
 
 export const permitStore = {
+  // Приводим JSON-поля к допустимым значениям ([], {} или null), исключая undefined
+  _normalizeJson<T extends Record<string, any>>(payload: T): T {
+    const next = { ...payload } as T
+    const arrayJsonKeys = ['safety_measures', 'equipment', 'hazards', 'attachments', 'daily_admissions']
+    for (const key of arrayJsonKeys) {
+      if (key in next) {
+        const val = next[key]
+        if (val === undefined) {
+          next[key] = []
+        }
+      }
+    }
+    return next
+  },
   async getAll() {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase not available');
@@ -54,9 +68,10 @@ export const permitStore = {
       throw new Error('Supabase not available');
     }
     
+    const prepared = this._normalizeJson<NewPermit>(permit)
     const { data, error } = await supabase!
       .from('permits')
-      .insert([permit])
+      .insert<NewPermit>([prepared])
       .select()
       .single();
 
@@ -70,7 +85,7 @@ export const permitStore = {
       
       const { error: workersError } = await supabase!
         .from('permit_workers')
-        .insert(workers);
+        .insert<Database['public']['Tables']['permit_workers']['Insert']>(workers);
         
       if (workersError) {
         console.error('Error adding workers:', workersError);
@@ -85,9 +100,10 @@ export const permitStore = {
       throw new Error('Supabase not available');
     }
     
+    const prepared = this._normalizeJson<UpdatePermit>(permit)
     const { data, error } = await supabase!
       .from('permits')
-      .update(permit)
+      .update<UpdatePermit>(prepared)
       .eq('id', id)
       .select()
       .single();
@@ -110,7 +126,7 @@ export const permitStore = {
         
         await supabase!
           .from('permit_workers')
-          .insert(workers);
+          .insert<Database['public']['Tables']['permit_workers']['Insert']>(workers);
       }
     }
 

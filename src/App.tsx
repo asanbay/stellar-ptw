@@ -14,17 +14,20 @@ import { InfoBoard } from '@/components/InfoBoard'
 import { LoginDialog } from '@/components/LoginDialog'
 import { DepartmentsTab } from '@/components/DepartmentsTab'
 import { FAQTab } from '@/components/FAQTab'
-import type { Person, Language, Department, FAQItem } from '@/lib/ptw-types'
+import type { Person, Language, Department, FAQItem, UserMode } from '@/lib/ptw-types'
 import { useLanguage } from '@/hooks/use-language'
 import { calculatePersonStats, exportToCSV } from '@/lib/ptw-utils'
 import { generateId, cn } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 import { THEMES } from '@/lib/themes'
 import { INITIAL_FAQS } from '@/lib/faq-data'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { isSupabaseAvailable } from '@/lib/supabase'
+import { editLocks } from '@/lib/edit-locks'
 import { personnelStore } from '@/stores/personnel.store'
 import { departmentStore } from '@/stores/departments.store'
 import { faqStore } from '@/stores/faq.store'
+import { PROCEDURE_DUTIES, AUTO_QUALIFICATIONS } from '@/lib/ptw-constants'
 import {
   buildDepartmentInsert,
   buildDepartmentUpdate,
@@ -128,8 +131,10 @@ function App() {
   const [localPersons, setLocalPersons] = useKV<Person[]>('ptw-persons', INITIAL_PERSONS)
   const [localDepartments, setLocalDepartments] = useKV<Department[]>('ptw-departments', INITIAL_DEPARTMENTS)
   const [localFaqs, setLocalFaqs] = useKV<FAQItem[]>('ptw-faqs', INITIAL_FAQS)
+  const [localPermits] = useKV<any[]>('ptw-forms', [])
   const [forceOffline, setForceOffline] = useKV<boolean>('ptw-force-offline', false)
   const supabaseEnabled = isSupabaseAvailable()
+  const requireOnline = (import.meta as any).env?.VITE_REQUIRE_ONLINE === 'true'
   const [remoteLoading, setRemoteLoading] = useState<boolean>(supabaseEnabled)
   const [remoteError, setRemoteError] = useState<string | null>(null)
   const [remotePersons, setRemotePersons] = useState<Person[] | null>(null)
@@ -140,14 +145,16 @@ function App() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [editingPerson, setEditingPerson] = useState<Person | undefined>()
-  const [userMode, setUserMode] = useState<'user' | 'admin'>('user')
+  const [userMode, setUserMode] = useState<UserMode>('user')
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
   const [currentTheme, setCurrentTheme] = useKV<string>('ptw-theme', 'stellar')
+  const [sessionId] = useKV<string>('ptw-session-id', generateId())
+  const [currentLock, setCurrentLock] = useState<{ type: string; id: string } | null>(null)
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
   const isMobile = useIsMobile()
 
   useEffect(() => {
-    console.log('🚀 App initialized:', {
+    logger.log('🚀 App initialized:', {
       supabaseEnabled,
       localPersonsCount: localPersons?.length || 0,
       localDepartmentsCount: localDepartments?.length || 0,
@@ -156,27 +163,53 @@ function App() {
   }, [])
 
   const loadSupabaseData = useCallback(async () => {
-    if (!supabaseEnabled) return
+    if (!supabaseEnabled) {
+      logger.log('⚠️ Supabase отключен, используем localStorage')
+      return
+    }
 
     setRemoteLoading(true)
     setRemoteError(null)
 
     try {
+      logger.log('🔄 Загружаем данные из Supabase...')
+      
       const [departmentsData, personsData, faqData] = await Promise.all([
-        departmentStore.getAll(),
-        personnelStore.getAll(),
-        faqStore.getAll(),
+        departmentStore.getAll().catch(err => {
+          logger.error('❌ Ошибка загрузки отделов:', err)
+          return []
+        }),
+        personnelStore.getAll().catch(err => {
+          logger.error('❌ Ошибка загрузки персонала:', err)
+          return []
+        }),
+        faqStore.getAll().catch(err => {
+          logger.error('❌ Ошибка загрузки FAQ:', err)
+          return []
+        }),
       ])
 
-      setRemoteDepartments(departmentsData.map(mapDepartmentRow))
-      setRemotePersons(personsData.map(mapPersonnelRow))
-      setRemoteFaqs(faqData.map(mapFAQRow))
+      const departments = departmentsData.map(mapDepartmentRow)
+      const persons = personsData.map(mapPersonnelRow)
+      const faqs = faqData.map(mapFAQRow)
+      
+      setRemoteDepartments(departments)
+      setRemotePersons(persons)
+      setRemoteFaqs(faqs)
+      
+      logger.log('✅ Данные из Supabase загружены:', {
+        departments: departments.length,
+        persons: persons.length,
+        faqs: faqs.length
+      })
     } catch (error) {
-      console.error('Failed to load Supabase data', error)
+      logger.error('❌ Failed to load Supabase data:', error)
       setRemoteDepartments(null)
       setRemotePersons(null)
       setRemoteFaqs(null)
-      setRemoteError(error instanceof Error ? error.message : 'Unknown Supabase error')
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Supabase error'
+      setRemoteError(errorMsg)
+      logger.log('⚠️ Переключаемся на localStorage из-за ошибки')
     } finally {
       setRemoteLoading(false)
     }
@@ -212,7 +245,7 @@ function App() {
   }, [remoteError, supabaseEnabled, language])
 
   const remoteReady = supabaseEnabled && remotePersons !== null && remoteDepartments !== null && remoteFaqs !== null
-  const usingSupabaseData = !forceOffline && remoteReady && !remoteError
+  const usingSupabaseData = (requireOnline ? true : !forceOffline) && remoteReady && !remoteError
 
   const allPersons = usingSupabaseData ? remotePersons! : localPersons || INITIAL_PERSONS
   const allDepartments = usingSupabaseData ? remoteDepartments! : localDepartments || INITIAL_DEPARTMENTS
@@ -246,13 +279,27 @@ function App() {
     setDialogOpen(true)
   }
 
-  const handleEditPerson = (person: Person) => {
+  const handleEditPerson = async (person: Person) => {
+    // Захватываем блокировку на профиль перед редактированием
+    const { ok } = await editLocks.acquire('personnel', person.id, sessionId)
+    if (!ok) {
+      toast.warning(
+        language === 'ru'
+          ? 'Этот профиль редактируется другим пользователем'
+          : language === 'tr'
+            ? 'Bu profil başka bir kullanıcı tarafından düzenleniyor'
+            : 'This profile is being edited by another user'
+      )
+      return
+    }
+    setCurrentLock({ type: 'personnel', id: person.id })
     setEditingPerson(person)
     setDialogOpen(true)
   }
 
   const handleSavePerson = async (personData: Partial<Person>) => {
-    console.log('💾 handleSavePerson called', { personData, editingPerson, usingSupabaseData })
+    if (!ensureOnlineWrite()) return
+    logger.log('💾 handleSavePerson called', { personData, editingPerson, usingSupabaseData })
     const successMessage = editingPerson
       ? language === 'ru' ? '✅ Обновлено' : language === 'tr' ? '✅ Güncellendi' : '✅ Updated'
       : language === 'ru' ? '✅ Добавлено' : language === 'tr' ? '✅ Eklendi' : '✅ Added'
@@ -274,6 +321,12 @@ function App() {
           setRemotePersons((current) => current ? [...current, mapped] : [mapped])
         }
         toast.success(successMessage)
+        // Освобождаем блокировку после успешного сохранения в облаке
+        if (currentLock?.type === 'personnel' && (editingPerson?.id || personData.id)) {
+          const id = editingPerson?.id || personData.id!
+          await editLocks.release('personnel', id, sessionId)
+          setCurrentLock(null)
+        }
       } catch (error) {
         console.error('Failed to save personnel', error)
         const details = error instanceof Error ? error.message : 'Unknown error'
@@ -301,9 +354,16 @@ function App() {
     }
 
     toast.success(successMessage)
+    // Освобождаем блокировку после локального сохранения
+    if (currentLock?.type === 'personnel') {
+      const id = editingPerson?.id || ''
+      if (id) await editLocks.release('personnel', id, sessionId)
+      setCurrentLock(null)
+    }
   }
 
   const handleDeletePerson = async (id: string) => {
+    if (!ensureOnlineWrite()) return
     const successMessage = language === 'ru' ? '✅ Удалено' : language === 'tr' ? '✅ Silindi' : '✅ Deleted'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось удалить сотрудника'
@@ -340,6 +400,7 @@ function App() {
   }
 
   const handleUpdateDuties = async (personId: string, duties: string[]) => {
+    if (!ensureOnlineWrite()) return
     const successMessage = language === 'ru' ? '✅ Обязанности обновлены' : language === 'tr' ? '✅ Yükümlülükler güncellendi' : '✅ Duties updated'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось обновить обязанности'
@@ -347,9 +408,10 @@ function App() {
         ? '❌ Yükümlülükler güncellenemedi'
         : '❌ Failed to update duties'
 
+    const sanitized = duties && duties.length > 0 ? duties : undefined
     if (usingSupabaseData) {
       try {
-        const updated = await personnelStore.update(personId, buildPersonnelUpdate({ customDuties: duties }))
+        const updated = await personnelStore.update(personId, buildPersonnelUpdate({ customDuties: sanitized }))
         const mapped = mapPersonnelRow(updated)
         setRemotePersons((current) => current ? current.map((p) => (p.id === personId ? mapped : p)) : [mapped])
         toast.success(successMessage)
@@ -361,11 +423,12 @@ function App() {
       return
     }
 
-    setLocalPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customDuties: duties } : p)))
+    setLocalPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customDuties: sanitized } : p)))
     toast.success(successMessage)
   }
 
   const handleUpdateQualifications = async (personId: string, qualifications: string[]) => {
+    if (!ensureOnlineWrite()) return
     const successMessage = language === 'ru' ? '✅ Квалификация обновлена' : language === 'tr' ? '✅ Nitelikler güncellendi' : '✅ Qualifications updated'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось обновить квалификацию'
@@ -373,9 +436,10 @@ function App() {
         ? '❌ Nitelikler güncellenemedi'
         : '❌ Failed to update qualifications'
 
+    const sanitized = qualifications && qualifications.length > 0 ? qualifications : undefined
     if (usingSupabaseData) {
       try {
-        const updated = await personnelStore.update(personId, buildPersonnelUpdate({ customQualifications: qualifications }))
+        const updated = await personnelStore.update(personId, buildPersonnelUpdate({ customQualifications: sanitized }))
         const mapped = mapPersonnelRow(updated)
         setRemotePersons((current) => current ? current.map((p) => (p.id === personId ? mapped : p)) : [mapped])
         toast.success(successMessage)
@@ -387,60 +451,94 @@ function App() {
       return
     }
 
-    setLocalPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customQualifications: qualifications } : p)))
+    setLocalPersons((current) => (current || []).map((p) => (p.id === personId ? { ...p, customQualifications: sanitized } : p)))
     toast.success(successMessage)
   }
 
   const handleImportPersons = async (importedPersons: Person[]) => {
-    console.log('📥 handleImportPersons вызван:', {
-      count: importedPersons.length,
-      usingSupabase: usingSupabaseData,
-      persons: importedPersons
-    })
-    
-    if (importedPersons.length === 0) {
-      console.warn('⚠️ Нет данных для импорта')
-      return
-    }
-
-    const successMessage = language === 'ru'
-      ? `✅ Импортировано ${importedPersons.length} сотрудников`
-      : language === 'tr'
-        ? `✅ ${importedPersons.length} çalışan içe aktarıldı`
-        : `✅ Imported ${importedPersons.length} personnel`
-    const errorMessage = language === 'ru'
-      ? '❌ Не удалось импортировать сотрудников'
-      : language === 'tr'
-        ? '❌ Personel içe aktarılamadı'
-        : '❌ Failed to import personnel'
-
-    if (usingSupabaseData) {
-      try {
-        console.log('💾 Импорт в Supabase...')
-        const payload = importedPersons.map((person) => buildPersonnelInsert(person))
-        console.log('📤 Payload для Supabase:', payload)
-        const inserted = await personnelStore.bulkCreate(payload)
-        console.log('✅ Supabase вернул:', inserted)
-        const mapped = inserted.map(mapPersonnelRow)
-        console.log('✅ Mapped данные:', mapped)
-        setRemotePersons((current) => current ? [...current, ...mapped] : mapped)
-        toast.success(successMessage)
-        console.log('✅ Импорт в Supabase завершен успешно')
-      } catch (error) {
-        console.error('❌ Failed to import personnel', error)
-        const details = error instanceof Error ? error.message : 'Unknown error'
-        toast.error(`${errorMessage}: ${details}`)
+    if (!ensureOnlineWrite()) return
+    try {
+      logger.log('📥 handleImportPersons вызван:', {
+        count: importedPersons.length,
+        usingSupabase: usingSupabaseData,
+        samplePerson: importedPersons[0]
+      })
+      
+      if (!importedPersons || importedPersons.length === 0) {
+        logger.warn('⚠️ Нет данных для импорта')
+        toast.warning(language === 'ru' ? 'Нет данных для импорта' : 'No data to import')
+        return
       }
-      return
-    }
 
-    console.log('💾 Импорт в localStorage...')
-    setLocalPersons((current) => [...(current || []), ...importedPersons])
-    toast.success(successMessage)
-    console.log('✅ Импорт в localStorage завершен')
+      const successMessage = language === 'ru'
+        ? `✅ Импортировано ${importedPersons.length} сотрудников`
+        : language === 'tr'
+          ? `✅ ${importedPersons.length} çalışan içe aktarıldı`
+          : `✅ Imported ${importedPersons.length} personnel`
+      const errorMessage = language === 'ru'
+        ? '❌ Не удалось импортировать сотрудников'
+        : language === 'tr'
+          ? '❌ Personel içe aktarılamadı'
+          : '❌ Failed to import personnel'
+
+      if (usingSupabaseData) {
+        try {
+          logger.log('💾 Начинаем импорт в Supabase...', { count: importedPersons.length })
+          
+          // Валидация и подготовка данных
+          const validPersons = importedPersons.filter(p => {
+            if (!p.name || !p.position || !p.role) {
+              logger.warn('⚠️ Пропускаем невалидного сотрудника:', p)
+              return false
+            }
+            return true
+          })
+          
+          if (validPersons.length === 0) {
+            throw new Error('Нет валидных данных для импорта')
+          }
+          
+          const payload = validPersons.map((person) => {
+            try {
+              return buildPersonnelInsert(person)
+            } catch (err) {
+              logger.error('❌ Ошибка при подготовке данных сотрудника:', person, err)
+              throw err
+            }
+          })
+          
+          logger.log('📤 Отправляем в Supabase:', { count: payload.length })
+          const inserted = await personnelStore.bulkCreate(payload)
+          logger.log('✅ Supabase вернул записей:', inserted.length)
+          
+          const mapped = inserted.map(mapPersonnelRow)
+          setRemotePersons((current) => current ? [...current, ...mapped] : mapped)
+          toast.success(`${successMessage} (${validPersons.length}/${importedPersons.length})`)
+          logger.log('✅ Импорт в Supabase завершен успешно')
+        } catch (error) {
+          logger.error('❌ Failed to import personnel to Supabase:', error)
+          const details = error instanceof Error ? error.message : 'Unknown error'
+          toast.error(`${errorMessage}: ${details}`, { duration: 5000 })
+          // Fallback to localStorage on error
+          logger.log('⚠️ Переключаемся на localStorage из-за ошибки')
+          setLocalPersons((current) => [...(current || []), ...importedPersons])
+          toast.info(language === 'ru' ? 'Данные сохранены локально' : 'Data saved locally')
+        }
+        return
+      }
+
+      logger.log('💾 Импортируем в localStorage...')
+      setLocalPersons((current) => [...(current || []), ...importedPersons])
+      toast.success(successMessage)
+      logger.log('✅ Импорт в localStorage завершен')
+    } catch (error) {
+      logger.error('❌ Critical error in handleImportPersons:', error)
+      toast.error(language === 'ru' ? 'Критическая ошибка при импорте' : 'Critical import error')
+    }
   }
 
   const handleAddDepartment = async (deptData: Partial<Department>) => {
+    if (!ensureOnlineWrite()) return
     const successMessage = language === 'ru' ? '✅ Отдел добавлен' : language === 'tr' ? '✅ Departman eklendi' : '✅ Department added'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось добавить отдел'
@@ -474,6 +572,7 @@ function App() {
   }
 
   const handleEditDepartment = async (id: string, deptData: Partial<Department>) => {
+    if (!ensureOnlineWrite()) return
     const successMessage = language === 'ru' ? '✅ Отдел обновлен' : language === 'tr' ? '✅ Departman güncellendi' : '✅ Department updated'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось обновить отдел'
@@ -500,6 +599,7 @@ function App() {
   }
 
   const handleDeleteDepartment = async (id: string) => {
+    if (!ensureOnlineWrite()) return
     const successMessage = language === 'ru' ? '✅ Отдел удален' : language === 'tr' ? '✅ Departman silindi' : '✅ Department deleted'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось удалить отдел'
@@ -527,6 +627,9 @@ function App() {
   }
 
   const handleAddFAQ = async (faqData: Partial<FAQItem>) => {
+    if (!ensureOnlineWrite()) return
+    logger.log('📝 handleAddFAQ вызван:', faqData)
+    
     const successMessage = language === 'ru' ? '✅ Вопрос добавлен' : language === 'tr' ? '✅ Soru eklendi' : '✅ Question added'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось добавить вопрос'
@@ -537,18 +640,41 @@ function App() {
 
     if (usingSupabaseData) {
       try {
+        // Проверяем на дубликаты
+        const isDuplicate = allFaqs.some(f => 
+          f.question[language] === faqData.question?.[language]
+        )
+        
+        if (isDuplicate) {
+          logger.warn('⚠️ FAQ уже существует, пропускаем')
+          toast.warning(language === 'ru' ? 'Этот вопрос уже существует' : 'This question already exists')
+          return
+        }
+        
         const created = await faqStore.create(buildFAQInsert({ ...faqData, order }))
         const mapped = mapFAQRow(created)
         setRemoteFaqs((current) => {
           const next = current ? [...current, mapped] : [mapped]
           return next.sort((a, b) => a.order - b.order)
         })
+        logger.log('✅ FAQ добавлен в Supabase')
         toast.success(successMessage)
       } catch (error) {
-        console.error('Failed to add FAQ', error)
+        logger.error('❌ Failed to add FAQ:', error)
         const details = error instanceof Error ? error.message : 'Unknown error'
         toast.error(`${errorMessage}: ${details}`)
       }
+      return
+    }
+
+    // Проверяем на дубликаты в localStorage
+    const isDuplicate = allFaqs.some(f => 
+      f.question[language] === faqData.question?.[language]
+    )
+    
+    if (isDuplicate) {
+      logger.warn('⚠️ FAQ уже существует в localStorage')
+      toast.warning(language === 'ru' ? 'Этот вопрос уже существует' : 'This question already exists')
       return
     }
 
@@ -560,10 +686,14 @@ function App() {
       order,
     }
     setLocalFaqs((current) => [...(current || []), newFAQ])
+    logger.log('✅ FAQ добавлен в localStorage')
     toast.success(successMessage)
   }
 
   const handleEditFAQ = async (id: string, faqData: Partial<FAQItem>) => {
+    if (!ensureOnlineWrite()) return
+    logger.log('✏️ handleEditFAQ вызван:', { id, faqData })
+    
     const successMessage = language === 'ru' ? '✅ Вопрос обновлен' : language === 'tr' ? '✅ Soru güncellendi' : '✅ Question updated'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось обновить вопрос'
@@ -593,6 +723,9 @@ function App() {
   }
 
   const handleDeleteFAQ = async (id: string) => {
+    if (!ensureOnlineWrite()) return
+    logger.log('🗑️ handleDeleteFAQ вызван:', id)
+    
     const successMessage = language === 'ru' ? '✅ Вопрос удален' : language === 'tr' ? '✅ Soru silindi' : '✅ Question deleted'
     const errorMessage = language === 'ru'
       ? '❌ Не удалось удалить вопрос'
@@ -719,31 +852,55 @@ function App() {
     let skippedCount = 0
 
     try {
-      // 1. Sync Departments
-      const currentRemoteDepts = await departmentStore.getAll()
+      // 1. Sync Departments and build ID Map
+      const currentRemoteDepts = (await departmentStore.getAll()).map(mapDepartmentRow)
+      const deptMap = new Map<string, string>() // Local ID -> Remote ID
+
       for (const localDept of (localDepartments || [])) {
-        // Check by Name or ID
-        const exists = currentRemoteDepts.some(d => d.name === localDept.name || d.id === localDept.id)
-        if (!exists) {
-          await departmentStore.create(buildDepartmentInsert(localDept))
-          addedCount++
-        } else {
+        // Find existing remote department by Name
+        const remoteDept = currentRemoteDepts.find(d => d.name === localDept.name)
+        
+        if (remoteDept) {
+          deptMap.set(localDept.id, remoteDept.id)
           skippedCount++
+        } else {
+          // Create new department
+          const payload = buildDepartmentInsert(localDept)
+          delete payload.id // Let DB generate UUID
+           const createdDept = await departmentStore.create(payload)
+           const newDept = mapDepartmentRow(createdDept)
+           if (newDept && newDept.id) {
+             deptMap.set(localDept.id, newDept.id)
+             addedCount++
+          }
         }
       }
 
       // 2. Sync Personnel
-      const currentRemotePersons = await personnelStore.getAll()
+      const currentRemotePersons = (await personnelStore.getAll()).map(mapPersonnelRow)
       for (const localPerson of (localPersons || [])) {
-        // Check by Email (if exists) or Name + Role, or ID
+        // Check by Email (if exists) or Name + Role
         const exists = currentRemotePersons.some(p =>
-          p.id === localPerson.id ||
           (localPerson.email && p.email === localPerson.email) ||
           (p.name === localPerson.name && p.role === localPerson.role)
         )
 
         if (!exists) {
-          await personnelStore.create(buildPersonnelInsert(localPerson))
+          const payload = buildPersonnelInsert(localPerson)
+          delete payload.id // Let DB generate UUID
+          
+          // Map Department ID
+          if (localPerson.departmentId) {
+            const remoteDeptId = deptMap.get(localPerson.departmentId)
+            if (remoteDeptId) {
+              payload.department_id = remoteDeptId
+            } else {
+              console.warn(`Skipping department link for ${localPerson.name}: Local Dept ${localPerson.departmentId} not found in remote map`)
+              payload.department_id = null
+            }
+          }
+
+          await personnelStore.create(payload)
           addedCount++
         } else {
           skippedCount++
@@ -751,11 +908,14 @@ function App() {
       }
 
       // 3. Sync FAQs
-      const currentRemoteFaqs = await faqStore.getAll()
+      const currentRemoteFaqs = (await faqStore.getAll()).map(mapFAQRow)
+      const sameTranslation = (a: any, b: any) => a?.ru === b?.ru && a?.tr === b?.tr && a?.en === b?.en
       for (const localFaq of (localFaqs || [])) {
-        const exists = currentRemoteFaqs.some(f => f.id === localFaq.id || f.question === localFaq.question)
+        const exists = currentRemoteFaqs.some(f => sameTranslation(f.question, localFaq.question))
         if (!exists) {
-          await faqStore.create(buildFAQInsert(localFaq))
+          const payload = buildFAQInsert(localFaq)
+          delete payload.id // Let DB generate UUID
+          await faqStore.create(payload)
           addedCount++
         } else {
           skippedCount++
@@ -776,11 +936,157 @@ function App() {
 
     } catch (error) {
       console.error('Sync error:', error)
-      toast.error(language === 'ru' ? 'Ошибка синхронизации' : 'Sync error', { id: toastId })
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(
+        language === 'ru' 
+          ? `Ошибка синхронизации: ${errorMessage}` 
+          : `Sync error: ${errorMessage}`, 
+        { id: toastId, duration: 5000 }
+      )
     }
   }
 
+  // Авто-синхронизация локальных данных в облако при доступности Supabase (один раз за сессию)
+  const autoSyncToCloud = useCallback(async () => {
+    if (!isSupabaseAvailable()) return
+    try {
+      const key = 'ptw-auto-sync-done'
+      const already = typeof window !== 'undefined' ? sessionStorage.getItem(key) : '1'
+      if (already) return
+      sessionStorage.setItem(key, '1')
+    } catch (_) {}
+
+    let addedCount = 0
+    let skippedCount = 0
+
+    try {
+      const currentRemoteDepts = (await departmentStore.getAll()).map(mapDepartmentRow)
+      const deptMap = new Map<string, string>()
+
+      for (const localDept of (localDepartments || [])) {
+        const remoteDept = currentRemoteDepts.find(d => d.name === localDept.name)
+        if (remoteDept) {
+          deptMap.set(localDept.id, remoteDept.id)
+          skippedCount++
+        } else {
+          const payload = buildDepartmentInsert(localDept)
+          delete (payload as any).id
+          const createdDept = await departmentStore.create(payload)
+          const newDept = mapDepartmentRow(createdDept)
+          if (newDept && newDept.id) {
+            deptMap.set(localDept.id, newDept.id)
+            addedCount++
+          }
+        }
+      }
+
+      const currentRemotePersons = (await personnelStore.getAll()).map(mapPersonnelRow)
+      for (const localPerson of (localPersons || [])) {
+        const exists = currentRemotePersons.some(p =>
+          (localPerson.email && p.email === localPerson.email) ||
+          (p.name === localPerson.name && p.role === localPerson.role)
+        )
+
+        if (!exists) {
+          const payload = buildPersonnelInsert(localPerson)
+          delete (payload as any).id
+          if (localPerson.departmentId) {
+            const remoteDeptId = deptMap.get(localPerson.departmentId)
+            payload.department_id = remoteDeptId || null
+          }
+          await personnelStore.create(payload)
+          addedCount++
+        } else {
+          skippedCount++
+        }
+      }
+
+      const currentRemoteFaqs = (await faqStore.getAll()).map(mapFAQRow)
+      const sameTranslation = (a: any, b: any) => a?.ru === b?.ru && a?.tr === b?.tr && a?.en === b?.en
+      for (const localFaq of (localFaqs || [])) {
+        const exists = currentRemoteFaqs.some(f => sameTranslation(f.question, localFaq.question))
+        if (!exists) {
+          const payload = buildFAQInsert(localFaq)
+          delete (payload as any).id
+          await faqStore.create(payload)
+          addedCount++
+        } else {
+          skippedCount++
+        }
+      }
+
+      const msg = language === 'ru'
+        ? `Авто-синхронизация завершена. Добавлено: ${addedCount}, Пропущено: ${skippedCount}`
+        : language === 'tr'
+          ? `Otomatik senkron tamamlandı. Eklendi: ${addedCount}, Atlandı: ${skippedCount}`
+          : `Auto sync done. Added: ${addedCount}, Skipped: ${skippedCount}`
+      toast.success(msg)
+
+      if (!forceOffline) {
+        loadSupabaseData()
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error.message : 'Unknown error'
+      const msg = language === 'ru' ? `Авто-синхронизация: ошибка: ${err}` : `Auto sync error: ${err}`
+      toast.error(msg)
+    }
+  }, [localDepartments, localPersons, localFaqs, language, forceOffline, loadSupabaseData])
+
+  useEffect(() => {
+    if (requireOnline && supabaseEnabled && remoteReady && !remoteError) {
+      autoSyncToCloud()
+    }
+  }, [requireOnline, supabaseEnabled, remoteReady, remoteError, autoSyncToCloud])
+
   const l = labels[language]
+
+  const writesForbidden = requireOnline && !supabaseEnabled
+  const ensureOnlineWrite = () => {
+    if (writesForbidden) {
+      const msg = language === 'ru'
+        ? 'Недоступно: требуется онлайн и настроенный Supabase (.env).'
+        : language === 'tr'
+          ? 'Kullanılamıyor: Çevrimiçi ve yapılandırılmış Supabase (.env) gerekli.'
+          : 'Unavailable: Online mode and configured Supabase (.env) required.'
+      toast.error(msg)
+      return false
+    }
+    return true
+  }
+
+  // Автоприменение обязанностей/квалификаций по роли без подтверждения
+  useEffect(() => {
+    if (!selectedPerson) return
+    if (!isAdminMode) return
+    if (requireOnline && !supabaseEnabled) return
+
+    const hasCustoms = (selectedPerson.customDuties && selectedPerson.customDuties.length > 0) ||
+      (selectedPerson.customQualifications && selectedPerson.customQualifications.length > 0)
+    if (hasCustoms) return
+
+    const appliedKey = `ptw-auto-apply-done-${selectedPerson.id}`
+    try {
+      const alreadyApplied = typeof window !== 'undefined' ? sessionStorage.getItem(appliedKey) : '1'
+      if (alreadyApplied) return
+      sessionStorage.setItem(appliedKey, '1')
+    } catch (_) {
+      // ignore sessionStorage errors
+    }
+
+    const duties = PROCEDURE_DUTIES[selectedPerson.role][language]
+    const quals = AUTO_QUALIFICATIONS[selectedPerson.role][language]
+
+    ;(async () => {
+      try {
+        await handleUpdateDuties(selectedPerson.id, duties)
+        await handleUpdateQualifications(selectedPerson.id, quals)
+        const doneMsg = language === 'ru' ? '✅ Обязанности и квалификация применены' : language === 'tr' ? '✅ Görevler ve nitelikler uygulandı' : '✅ Duties and qualifications applied'
+        toast.success(doneMsg)
+      } catch (e) {
+        // handleUpdate* уже показывают свои ошибки; тут просто перестраховка
+      }
+    })()
+  }, [selectedPersonId, isAdminMode, language, requireOnline, supabaseEnabled])
 
   const LoadingFallback = () => (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -891,7 +1197,7 @@ function App() {
                 </SheetContent>
               </Sheet>
             )}
-            {supabaseEnabled && (
+            {supabaseEnabled && !requireOnline && (
               <div className="flex gap-1">
                 <Button
                   variant={forceOffline ? "destructive" : "secondary"}
@@ -969,11 +1275,11 @@ function App() {
             </Button>
             {isAdminMode && (
               <>
-                <Button size="sm" onClick={() => setImportDialogOpen(true)} variant="secondary" className="font-semibold">
+                <Button size="sm" onClick={() => setImportDialogOpen(true)} variant="secondary" className="font-semibold" disabled={writesForbidden} title={writesForbidden ? (language === 'ru' ? 'Требуется онлайн и Supabase' : language === 'tr' ? 'Çevrimiçi ve Supabase gerekli' : 'Online and Supabase required') : undefined}>
                   <Upload className="h-4 w-4 mr-1" />
                   {l.import}
                 </Button>
-                <Button size="sm" onClick={handleAddPerson} className="font-semibold bg-accent text-accent-foreground hover:bg-accent/90">
+                <Button size="sm" onClick={handleAddPerson} className="font-semibold bg-accent text-accent-foreground hover:bg-accent/90" disabled={writesForbidden} title={writesForbidden ? (language === 'ru' ? 'Требуется онлайн и Supabase' : language === 'tr' ? 'Çevrimiçi ve Supabase gerekli' : 'Online and Supabase required') : undefined}>
                   <UserPlus className="h-4 w-4 mr-1" />
                   {language === 'ru' ? 'Добавить' : language === 'tr' ? 'Ekle' : 'Add'}
                 </Button>
@@ -991,6 +1297,18 @@ function App() {
               : language === 'tr'
                 ? 'Supabase verileri yükleniyor...'
                 : 'Loading data from Supabase...'}
+          </div>
+        </div>
+      )}
+
+      {requireOnline && !supabaseEnabled && (
+        <div className="w-full px-4 py-2">
+          <div className="mx-auto max-w-[1800px] rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            {language === 'ru'
+              ? 'Требуется онлайн-режим: не настроен Supabase (.env). Укажите VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY.'
+              : language === 'tr'
+                ? 'Çevrimiçi mod gerekli: Supabase yapılandırılmamış (.env). VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY ayarlayın.'
+                : 'Online mode required: Supabase is not configured (.env). Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'}
           </div>
         </div>
       )}
@@ -1046,12 +1364,16 @@ function App() {
               {isSuperAdmin && (
                 <TabsContent value="dashboard" className="mt-0">
                   <Suspense fallback={<LoadingFallback />}>
-                    <SuperAdminDashboard language={language} />
+                    <SuperAdminDashboard 
+                      language={language}
+                      localPersonnel={allPersons}
+                      localPermits={localPermits}
+                      localDepartments={allDepartments}
+                    />
                   </Suspense>
                 </TabsContent>
               )}
-              <TabsContent value="personnel" className="mt-0">
-                <div className="space-y-6">
+              <TabsContent value="personnel" className="mt-0">\n                <div className="space-y-6">
                   {isMobile && (
                     <div className="md:hidden">
                       <PersonnelSidebar
@@ -1164,7 +1486,20 @@ function App() {
       <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} onLogin={handleAdminLogin} language={language} />
       {isAdminMode && (
         <>
-          <PersonDialog open={dialogOpen} onOpenChange={setDialogOpen} onSave={handleSavePerson} person={editingPerson} language={language} departments={allDepartments} />
+          <PersonDialog 
+            open={dialogOpen} 
+            onOpenChange={async (open) => {
+              setDialogOpen(open)
+              if (!open && currentLock?.type === 'personnel' && editingPerson?.id) {
+                await editLocks.release('personnel', editingPerson.id, sessionId)
+                setCurrentLock(null)
+              }
+            }} 
+            onSave={handleSavePerson} 
+            person={editingPerson} 
+            language={language} 
+            departments={allDepartments} 
+          />
           <ImportPersonnelDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} onImport={handleImportPersons} language={language} />
         </>
       )}

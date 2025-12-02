@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import type { Person, Language } from '@/lib/ptw-types'
 import { generateId } from '@/lib/utils'
 
@@ -139,7 +139,54 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
 
   const l = labels[language]
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('Персонал')
+
+      // Добавляем заголовки
+      worksheet.columns = [
+        { header: 'Имя', key: 'name', width: 30 },
+        { header: 'Должность', key: 'position', width: 25 },
+        { header: 'Роль', key: 'role', width: 15 },
+        { header: 'Email', key: 'email', width: 25 },
+        { header: 'Телефон', key: 'phone', width: 15 },
+      ]
+
+      // Добавляем примеры данных
+      worksheet.addRows([
+        { name: 'Иван Петров', position: 'Инженер', role: 'worker', email: 'ivan@example.com', phone: '+79991234567' },
+        { name: 'Мария Иванова', position: 'Директор', role: 'supervisor', email: 'maria@example.com', phone: '+79001234567' },
+        { name: 'Сергей Сидоров', position: 'Мастер', role: 'foreman', email: 'sergey@example.com', phone: '+79111234567' },
+      ])
+
+      // Стилизуем заголовок
+      worksheet.getRow(1).font = { bold: true }
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      }
+
+      // Генерируем и скачиваем файл
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'personnel_template.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+      
+      toast.success(language === 'ru' ? 'Шаблон скачан!' : language === 'tr' ? 'Şablon indirildi!' : 'Template downloaded!')
+    } catch (error) {
+      toast.error(language === 'ru' ? 'Ошибка загрузки шаблона' : language === 'tr' ? 'Şablon indirme hatası' : 'Template download error')
+    }
+  }
+
+  const downloadTemplateLegacy = () => {
     try {
       const templateData = [
         ['Имя', 'Должность', 'Роль', 'Email', 'Телефон'],
@@ -270,15 +317,36 @@ export function ImportPersonnelDialog({ open, onOpenChange, onImport, language }
         // Парсим Excel файл
         try {
           const arrayBuffer = await file.arrayBuffer()
-          const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-          const sheetName = workbook.SheetNames[0]
+          const workbook = new ExcelJS.Workbook()
+          await workbook.xlsx.load(arrayBuffer)
           
-          if (!sheetName) {
+          const worksheet = workbook.worksheets[0]
+          
+          if (!worksheet) {
             throw new Error(language === 'ru' ? 'Файл не содержит листов' : language === 'tr' ? 'Dosya sheet içermiyor' : 'File contains no sheets')
           }
           
-          const worksheet = workbook.Sheets[sheetName]
-          const data: any[] = XLSX.utils.sheet_to_json(worksheet)
+          const data: Record<string, unknown>[] = []
+          const headers: string[] = []
+          
+          // Читаем заголовки из первой строки
+          worksheet.getRow(1).eachCell((cell, colNumber) => {
+            headers[colNumber - 1] = String(cell.value || '')
+          })
+          
+          // Читаем данные со второй строки
+          worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return // Пропускаем заголовки
+            
+            const rowData: Record<string, unknown> = {}
+            row.eachCell((cell, colNumber) => {
+              const header = headers[colNumber - 1]
+              if (header) {
+                rowData[header] = cell.value
+              }
+            })
+            data.push(rowData)
+          })
           
           if (data.length === 0) {
             const error = language === 'ru' 

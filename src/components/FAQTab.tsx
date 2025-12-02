@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Plus, PencilSimple, Trash, Question } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,6 +6,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge'
 import { FAQDialog } from '@/components/FAQDialog'
 import type { FAQItem, Language } from '@/lib/ptw-types'
+import { editLocks, getDefaultOwnerId, startHeartbeat } from '@/lib/edit-locks'
+import { toast } from 'sonner'
 
 interface FAQTabProps {
   language: Language
@@ -19,6 +21,8 @@ interface FAQTabProps {
 export function FAQTab({ language, isAdmin, faqs, onAddFAQ, onEditFAQ, onDeleteFAQ }: FAQTabProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingFAQ, setEditingFAQ] = useState<FAQItem | undefined>()
+  const ownerIdRef = useRef<string>(getDefaultOwnerId())
+  const heartbeatRef = useRef<{ stop: () => void } | null>(null)
 
   const labels = {
     ru: {
@@ -63,9 +67,22 @@ export function FAQTab({ language, isAdmin, faqs, onAddFAQ, onEditFAQ, onDeleteF
     setDialogOpen(true)
   }
 
-  const handleEditClick = (faq: FAQItem) => {
+  const handleEditClick = async (faq: FAQItem) => {
+    const { ok } = await editLocks.acquire('faq', faq.id, ownerIdRef.current)
+    if (!ok) {
+      toast.warning(
+        language === 'ru'
+          ? 'Этот вопрос уже редактируется'
+          : language === 'tr'
+            ? 'Bu soru düzenleniyor'
+            : 'This question is being edited'
+      )
+      return
+    }
     setEditingFAQ(faq)
     setDialogOpen(true)
+    heartbeatRef.current?.stop?.()
+    heartbeatRef.current = startHeartbeat('faq', faq.id, ownerIdRef.current)
   }
 
   const handleSave = (faqData: Partial<FAQItem>) => {
@@ -178,7 +195,15 @@ export function FAQTab({ language, isAdmin, faqs, onAddFAQ, onEditFAQ, onDeleteF
       {isAdmin && (
         <FAQDialog
           open={dialogOpen}
-          onOpenChange={setDialogOpen}
+          onOpenChange={async (open) => {
+            setDialogOpen(open)
+            if (!open && editingFAQ) {
+              heartbeatRef.current?.stop?.()
+              heartbeatRef.current = null
+              await editLocks.release('faq', editingFAQ.id, ownerIdRef.current)
+              setEditingFAQ(undefined)
+            }
+          }}
           onSave={handleSave}
           faq={editingFAQ}
           language={language}

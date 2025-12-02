@@ -48,7 +48,7 @@ export const personnelStore = {
     
     const { data, error } = await supabase!
       .from('personnel')
-      .insert([person])
+      .insert<NewPersonnel>([person])
       .select()
       .single();
 
@@ -63,7 +63,7 @@ export const personnelStore = {
     
     const { data, error } = await supabase!
       .from('personnel')
-      .update(person)
+      .update<UpdatePersonnel>(person)
       .eq('id', id)
       .select()
       .single();
@@ -92,7 +92,7 @@ export const personnelStore = {
     
     const { data, error } = await supabase!
       .from('personnel')
-      .insert(persons)
+      .insert<NewPersonnel>(persons)
       .select();
 
     if (error) throw error;
