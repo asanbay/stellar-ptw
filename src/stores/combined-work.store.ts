@@ -38,14 +38,7 @@ export const combinedWorkStore = {
 
   async create(payload: CombinedWorkInsert): Promise<CombinedWorkRow> {
      if (!isSupabaseAvailable()) {
-      // enqueue offline create
-      offlineQueue.enqueue('combined_work_log', 'create', payload)
-      return {
-        ...(payload as any),
-        id: 'offline-' + Math.random().toString(36).slice(2),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as CombinedWorkRow
+       throw new Error('Supabase not available');
      }
 
     const prepared = normalizeJson<CombinedWorkInsert>(payload)
@@ -61,12 +54,7 @@ export const combinedWorkStore = {
 
   async update(id: string, payload: CombinedWorkUpdate): Promise<CombinedWorkRow> {
      if (!isSupabaseAvailable()) {
-      offlineQueue.enqueue('combined_work_log', 'update', { id, ...payload }, id)
-      return {
-        id,
-        ...(payload as any),
-        updated_at: new Date().toISOString(),
-      } as CombinedWorkRow
+       throw new Error('Supabase not available');
      }
 
     const prepared = normalizeJson<CombinedWorkUpdate>(payload)
@@ -83,8 +71,7 @@ export const combinedWorkStore = {
 
   async delete(id: string): Promise<void> {
      if (!isSupabaseAvailable()) {
-      offlineQueue.enqueue('combined_work_log', 'delete', { id }, id)
-      return
+       throw new Error('Supabase not available');
      }
 
      const { error } = await supabase!
